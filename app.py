@@ -6,6 +6,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+st.navigation([])
 
 st.title("Reservoir data explorer")
 st.write("Explore the reservoir observations imported from the local CSV file.")
