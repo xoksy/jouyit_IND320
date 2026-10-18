@@ -8,9 +8,10 @@ st.set_page_config(
 pages = {
     "Navigation": [
         st.Page("pages/0_home.py", title="Home"),
-        st.Page("pages/1_data.py", title="Imported data"),
-        st.Page("pages/2_plot.py", title="Plot"),
-        st.Page("pages/3_info.py", title="Project information"),
+        st.Page("pages/1_data.py", title="Reservoir measurements"),
+        st.Page("pages/2_plot.py", title="Reservoir trends"),
+        st.Page("pages/3_flows.py", title="Cross-border flows"),
+        st.Page("pages/4_info.py", title="Project information"),
     ]
 }
 
