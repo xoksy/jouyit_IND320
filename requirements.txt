@@ -1,3 +1,6 @@
-streamlit
+streamlit>=1.49
 pandas
 matplotlib
+python-dotenv
+requests
+pymongo
