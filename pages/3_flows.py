@@ -63,17 +63,17 @@ with left_column:
 with right_column:
     st.write("Months to include")
 
-    month_columns = st.columns(4)
-    selected_months = []
-
-    for month in range(1, 13):
-        with month_columns[(month - 1) % 4]:
-            if st.checkbox(
-                calendar.month_name[month],
-                value=False,
-                key=f"month_{month}",
-            ):
-                selected_months.append(month)
+    selected_months_names = st.pills(
+        "Select months",
+        options=[calendar.month_name[month] for month in range(1, 13)],
+        selection_mode="multi",
+        default=[],
+        label_visibility="collapsed",
+        key="selected_months",
+    )
+    selected_months = [
+        month for month in range(1, 13) if calendar.month_name[month] in selected_months_names
+    ]
 
 try:
     flow_data = load_flows_for_year(
@@ -101,10 +101,43 @@ else:
         st.subheader(f"Direction shares in {selected_year}")
 
         annual_data = flow_data.copy()
-        annual_data["energy_mwh"] = annual_data["flow_mw"] * 0.25
-        energy_by_direction = annual_data.groupby(
+        # Ensure timestamps are datetime objects
+        annual_data["timestamp"] = pd.to_datetime(annual_data["timestamp"])
+
+        # Sort measurements chronologically within each direction
+        annual_data = annual_data.sort_values(
+            ["from_zone", "to_zone", "timestamp"]
+        ).copy()
+
+        # Calculate the duration until the next measurement, in hours
+        annual_data["duration_hours"] = (
+            annual_data.groupby(["from_zone", "to_zone"])["timestamp"]
+            .shift(-1)
+            .sub(annual_data["timestamp"])
+            .dt.total_seconds()
+            / 3600
+        )
+
+        # Remove invalid intervals
+        annual_data.loc[
+            annual_data["duration_hours"] <= 0,
+            "duration_hours"
+        ] = float("nan")
+
+        # Convert power (MW) into estimated energy (MWh)
+        annual_data["energy_mwh"] = (
+            annual_data["flow_mw"] * annual_data["duration_hours"]
+        )
+
+        # Exclude measurements for which the duration is unknown
+        valid_data = annual_data.dropna(subset=["energy_mwh"]).copy()
+
+        # Calculate total signed energy for each direction
+        energy_by_direction = valid_data.groupby(
             ["from_zone", "to_zone"]
         )["energy_mwh"].sum()
+
+        # Use absolute values for the pie chart
         pie_values = energy_by_direction.abs()
 
         if pie_values.empty or pie_values.sum() == 0:
@@ -128,9 +161,11 @@ else:
             figure.tight_layout()
             st.pyplot(figure)
             st.caption(
-                "Shares use the absolute signed energy totals; each 15-minute "
-                "power measurement is converted to MWh."
-            )
+                "Shares are calculated from the absolute signed energy totals. "
+                "Energy is estimated by multiplying each power measurement (MW) "
+                "by the elapsed time until the next measurement. "
+                "This assumes constant power between consecutive timestamps."
+            )       
 
     with right_column:
         st.subheader(f"Physical flows in {selected_year}")
@@ -174,7 +209,12 @@ with st.expander("About these data"):
         "The measurements are read from the project's MongoDB collection "
         "`energy_database.crossborder_flows`. The collection contains "
         "cross-border physical-flow data sourced from the ENTSO-E "
-        "Transparency Platform. Measurements are stored in MW at 15-minute "
-        "intervals; the pie chart converts them to MWh before calculating "
-        "direction shares."
+        "Transparency Platform. Power measurements are stored in MW. "
+        "Although measurements are generally available at 15-minute "
+        "intervals, some connections contain longer intervals. "
+        "For the annual energy-share chart, energy is estimated by "
+        "multiplying each power measurement by the elapsed time until "
+        "the next measurement, assuming constant power over that interval. "
+        "The final measurement in each direction is excluded because "
+        "its interval duration cannot be determined from the available data."
     )
