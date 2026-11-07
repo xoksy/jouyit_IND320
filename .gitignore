@@ -4,3 +4,4 @@ __pycache__/
 .env
 .streamlit/secrets.toml
 notebooks/weather_NO3.csv
+notebooks/.cache.sqlite
