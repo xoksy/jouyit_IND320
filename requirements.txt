@@ -4,6 +4,7 @@ numpy
 matplotlib
 scipy
 scikit-learn
+statsmodels
 pymongo
 python-dotenv
 pyarrow
