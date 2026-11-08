@@ -8,3 +8,4 @@ statsmodels
 pymongo
 python-dotenv
 pyarrow
+plotly

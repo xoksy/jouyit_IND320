@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 import os
 from io import BytesIO
@@ -13,6 +12,9 @@ from gridfs import GridFSBucket
 
 from scipy.fft import dct, idct
 from sklearn.neighbors import LocalOutlierFactor
+
+import plotly.graph_objects as go
+
 
 # --------------------------------------------------
 # MONGODB CONNECTION
@@ -56,6 +58,7 @@ def get_weather_bucket():
 
     return bucket
 
+
 # --------------------------------------------------
 # AVAILABLE WEATHER ZONES
 # --------------------------------------------------
@@ -77,6 +80,7 @@ def available_weather_zones():
     zones = ["NO1", "NO2", "NO3", "NO4", "NO5"]
 
     return [zone for zone in zones if zone in available]
+
 
 # --------------------------------------------------
 # LOAD WEATHER DATA FROM MONGODB
@@ -100,7 +104,10 @@ def load_weather_data(region_id):
         )
 
     # Select the most recent version
-    latest_file = max(files, key=lambda file: file.upload_date)
+    latest_file = max(
+        files,
+        key=lambda file: file.upload_date
+    )
 
     # Download file into memory
     with bucket.open_download_stream(latest_file._id) as stream:
@@ -111,13 +118,18 @@ def load_weather_data(region_id):
 
     return weather_df
 
-#Add the two functions use in the notebook
+
+# --------------------------------------------------
+# TEMPERATURE ANOMALIES — LOCAL OUTLIER FACTOR
+# --------------------------------------------------
+
 def detect_temperature_outliers(
     weather_df,
     region_id,
     outlier_fraction=0.01,
     n_neighbors=20,
 ):
+
     # 1. Calculate average temperature for each timestamp
     temperature_mean = (
         weather_df.groupby("timestamp")["temperature_2m"]
@@ -133,10 +145,14 @@ def detect_temperature_outliers(
 
     # Check input parameters
     if not 0 < outlier_fraction <= 0.5:
-        raise ValueError("outlier_fraction must be between 0 and 0.5.")
+        raise ValueError(
+            "outlier_fraction must be between 0 and 0.5."
+        )
 
     if len(valid_data) <= n_neighbors:
-        raise ValueError("Not enough observations for the selected n_neighbors.")
+        raise ValueError(
+            "Not enough observations for the selected n_neighbors."
+        )
 
     # 3. Prepare data for LOF
     X = valid_data[["temperature_2m"]]
@@ -156,35 +172,62 @@ def detect_temperature_outliers(
         valid_data["is_outlier"]
     ].copy()
 
-    # 6. Create the final plot
-    figure, axis = plt.subplots(figsize=(16, 6))
+    # 6. Create interactive Plotly figure
+    figure = go.Figure()
 
-    axis.plot(
-        temperature_mean["timestamp"],
-        temperature_mean["temperature_2m"],
-        color="steelblue",
-        linewidth=0.7,
-        label="Average temperature"
+    # Average temperature
+    figure.add_trace(
+        go.Scatter(
+            x=temperature_mean["timestamp"],
+            y=temperature_mean["temperature_2m"],
+            mode="lines",
+            name="Average temperature",
+            line=dict(width=1),
+            hovertemplate=(
+                "Date: %{x|%d %b %Y %H:%M}<br>"
+                "Temperature: %{y:.2f} °C"
+                "<extra></extra>"
+            )
+        )
     )
 
-    axis.scatter(
-        outliers_df["timestamp"],
-        outliers_df["temperature_2m"],
-        color="red",
-        s=15,
-        label="LOF outliers",
-        zorder=3
+    # LOF outliers
+    figure.add_trace(
+        go.Scatter(
+            x=outliers_df["timestamp"],
+            y=outliers_df["temperature_2m"],
+            mode="markers",
+            name="LOF outliers",
+            marker=dict(
+                color="red",
+                size=6
+            ),
+            hovertemplate=(
+                "Date: %{x|%d %b %Y %H:%M}<br>"
+                "Temperature: %{y:.2f} °C"
+                "<extra>LOF outlier</extra>"
+            )
+        )
     )
 
-    axis.set_title(
-        f"Average hourly temperature and detected outliers — {region_id}"
+    figure.update_layout(
+        title=(
+            f"Average hourly temperature and detected outliers "
+            f"— {region_id}"
+        ),
+        xaxis_title="Date",
+        yaxis_title="Temperature (°C)",
+        hovermode="x unified",
+        template="plotly_white",
+        height=550,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
-    axis.set_xlabel("Date")
-    axis.set_ylabel("Temperature (°C)")
-    axis.grid(alpha=0.3)
-    axis.legend()
-
-    figure.tight_layout()
 
     # 7. Create statistical summary
     summary = {
@@ -210,12 +253,17 @@ def detect_temperature_outliers(
     return figure, outliers_df, summary
 
 
+# --------------------------------------------------
+# PRECIPITATION OUTLIERS — DCT + ROBUST SPC
+# --------------------------------------------------
+
 def detect_precipitation_outliers(
     weather_df,
     region_id,
     cutoff=100,
     n_std=3,
 ):
+
     # 1. Calculate average precipitation for each timestamp
     precipitation_mean = (
         weather_df.groupby("timestamp")["precipitation"]
@@ -225,14 +273,20 @@ def detect_precipitation_outliers(
     )
 
     # 2. Extract precipitation values
-    precipitation = precipitation_mean["precipitation"].to_numpy()
+    precipitation = precipitation_mean[
+        "precipitation"
+    ].to_numpy()
 
     # Check that the series is valid
     if len(precipitation) == 0 or not np.isfinite(precipitation).all():
-        raise ValueError("Precipitation data is empty or contains missing values.")
+        raise ValueError(
+            "Precipitation data is empty or contains missing values."
+        )
 
     if not 0 <= cutoff < len(precipitation):
-        raise ValueError("cutoff must be between 0 and the number of observations.")
+        raise ValueError(
+            "cutoff must be between 0 and the number of observations."
+        )
 
     if n_std <= 0:
         raise ValueError("n_std must be positive.")
@@ -254,7 +308,9 @@ def detect_precipitation_outliers(
 
     # 4. Calculate robust statistics
     satv_median = np.median(satv)
-    satv_mad = np.median(np.abs(satv - satv_median))
+    satv_mad = np.median(
+        np.abs(satv - satv_median)
+    )
 
     robust_std = 1.4826 * satv_mad
 
@@ -275,51 +331,78 @@ def detect_precipitation_outliers(
         precipitation_mean["is_outlier"]
     ].copy()
 
-    # 8. Create final plot
-    figure, axis = plt.subplots(figsize=(16, 6))
+    # 8. Create interactive Plotly figure
+    figure = go.Figure()
 
-    axis.plot(
-        precipitation_mean["timestamp"],
-        precipitation_mean["precipitation"],
-        color="steelblue",
-        linewidth=0.7,
-        label="Average precipitation"
+    # Average precipitation
+    figure.add_trace(
+        go.Scatter(
+            x=precipitation_mean["timestamp"],
+            y=precipitation_mean["precipitation"],
+            mode="lines",
+            name="Average precipitation",
+            line=dict(width=1),
+            hovertemplate=(
+                "Date: %{x|%d %b %Y %H:%M}<br>"
+                "Precipitation: %{y:.3f} mm"
+                "<extra></extra>"
+            )
+        )
     )
 
-    axis.scatter(
-        outliers_df["timestamp"],
-        outliers_df["precipitation"],
-        color="red",
-        s=12,
-        label="Outliers",
-        zorder=3
+    # Outliers
+    figure.add_trace(
+        go.Scatter(
+            x=outliers_df["timestamp"],
+            y=outliers_df["precipitation"],
+            mode="markers",
+            name="Outliers",
+            marker=dict(
+                color="red",
+                size=6
+            ),
+            hovertemplate=(
+                "Date: %{x|%d %b %Y %H:%M}<br>"
+                "Precipitation: %{y:.3f} mm"
+                "<extra>Outlier</extra>"
+            )
+        )
     )
 
-    axis.axhline(
-        upper_limit,
-        color="red",
-        linestyle="--",
-        label="Upper control limit (UCL)"
+    # Upper control limit
+    figure.add_hline(
+        y=upper_limit,
+        line_dash="dash",
+        line_color="red",
+        annotation_text="UCL"
     )
 
-    axis.axhline(
-        lower_limit,
-        color="red",
-        linestyle="--",
-        label="Lower control limit (LCL)"
+    # Lower control limit
+    figure.add_hline(
+        y=lower_limit,
+        line_dash="dash",
+        line_color="red",
+        annotation_text="LCL"
     )
 
-    axis.set_title(
-        f"Average hourly precipitation and detected outliers — "
-        f"{region_id} (2024) - cutoff={cutoff}, n_std={n_std}"
+    figure.update_layout(
+        title=(
+            f"Average hourly precipitation and detected outliers "
+            f"— {region_id} (2024) - cutoff={cutoff}, n_std={n_std}"
+        ),
+        xaxis_title="Date",
+        yaxis_title="Precipitation (mm)",
+        hovermode="x unified",
+        template="plotly_white",
+        height=550,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
-
-    axis.set_xlabel("Date")
-    axis.set_ylabel("Precipitation (mm)")
-    axis.grid(alpha=0.3)
-    axis.legend()
-
-    figure.tight_layout()
 
     # 9. Create statistical summary
     summary = {

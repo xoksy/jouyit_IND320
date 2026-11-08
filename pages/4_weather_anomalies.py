@@ -117,7 +117,10 @@ with tab1:
                     n_std=float(n_std),
                 )
 
-            st.pyplot(figure)
+            st.plotly_chart(
+                figure,
+                use_container_width=True
+            )
 
             st.subheader("Statistical summary")
 
@@ -204,7 +207,10 @@ with tab2:
                     n_neighbors=int(n_neighbors),
                 )
 
-            st.pyplot(figure)
+            st.plotly_chart(
+                figure,
+                use_container_width=True
+            )
 
             st.subheader("Statistical summary")
 

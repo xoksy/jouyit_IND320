@@ -1,3 +1,4 @@
+from matplotlib.pyplot import figure
 import streamlit as st
 import pandas as pd
 
@@ -51,7 +52,10 @@ with tab1:
             trend=int(trend),
             robust=robust
         )
-        st.pyplot(fig)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
 with tab2:
     st.subheader("Spectrogram")
@@ -67,4 +71,7 @@ with tab2:
             window_length=int(window_length),
             window_overlap=int(window_overlap)
         )
-        st.pyplot(fig)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
