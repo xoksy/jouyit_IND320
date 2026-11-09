@@ -10,3 +10,5 @@ data/
 .cache.sqlite
 **/.cache
 **/.cache.sqlite
+# Weather download test notebooks
+notebooks/test.ipynb
