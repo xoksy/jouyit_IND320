@@ -1,6 +1,11 @@
 streamlit>=1.49
 pandas
+numpy
 matplotlib
-python-dotenv
-requests
+scipy
+scikit-learn
+statsmodels
 pymongo
+python-dotenv
+pyarrow
+plotly

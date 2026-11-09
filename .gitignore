@@ -3,5 +3,12 @@ __pycache__/
 *$py.class
 .env
 .streamlit/secrets.toml
-notebooks/weather_NO3.csv
-notebooks/.cache.sqlite
+# Weather data
+data/
+# Open-Meteo cache
+.cache
+.cache.sqlite
+**/.cache
+**/.cache.sqlite
+# Weather download test notebooks
+notebooks/test.ipynb

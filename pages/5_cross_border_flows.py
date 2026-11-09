@@ -61,18 +61,41 @@ with left_column:
     )
 
 with right_column:
+
     st.write("Months to include")
 
-    selected_months_names = st.pills(
-        "Select months",
-        options=[calendar.month_name[month] for month in range(1, 13)],
+    months_row_1 = [
+        calendar.month_name[m] for m in range(1, 7)
+    ]
+
+    months_row_2 = [
+        calendar.month_name[m] for m in range(7, 13)
+    ]
+
+    selected_row_1 = st.pills(
+        "Months 1 to 6",
+        options=months_row_1,
         selection_mode="multi",
         default=[],
         label_visibility="collapsed",
-        key="selected_months",
+        key="months_row_1",
     )
+
+    selected_row_2 = st.pills(
+        "Months 7 to 12",
+        options=months_row_2,
+        selection_mode="multi",
+        default=[],
+        label_visibility="collapsed",
+        key="months_row_2",
+    )
+
+    selected_months_names = selected_row_1 + selected_row_2
+
     selected_months = [
-        month for month in range(1, 13) if calendar.month_name[month] in selected_months_names
+        month
+        for month in range(1, 13)
+        if calendar.month_name[month] in selected_months_names
     ]
 
 try:
