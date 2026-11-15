@@ -1,6 +1,7 @@
 import calendar
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from analysis_utils import apply_plotly_theme, PLOTLY_COLORS
 import streamlit as st
 from pymongo.errors import OperationFailure, PyMongoError
 
@@ -170,19 +171,48 @@ else:
                 f"{from_zone} → {to_zone}"
                 for from_zone, to_zone in energy_by_direction.index
             ]
-            figure, axis = plt.subplots(figsize=(7, 7))
-            axis.pie(
-                pie_values.values,
-                labels=labels,
-                autopct="%1.1f%%",
-                startangle=90,
+            # Create interactive pie chart
+            fig = go.Figure(
+                data=[
+                    go.Pie(
+                    labels=labels,
+                    values=pie_values.values,
+                    hole=0.4,
+                    textinfo="label+percent",
+                    marker=dict(
+                        colors=[
+                            PLOTLY_COLORS["secondary"]
+                            if "NO_" in label.split(" → ")[0]
+                            else PLOTLY_COLORS["electricity"]
+                            for label in labels
+                        ]
+                    ),
+                    hovertemplate=(
+                        "%{label}<br>"
+                        "Energy: %{value:,.2f} MWh<br>"
+                        "Share: %{percent}"
+                        "<extra></extra>"
+                    )
+                )
+                ]
             )
-            axis.set_title(
-                f"Absolute energy by direction ({selected_connection[0]} / "
-                f"{selected_connection[1]})"
+
+            fig = apply_plotly_theme(fig)
+
+            fig.update_layout(
+                title=dict(
+                    text="Energy share by direction",
+                    x=0.5
+                ),
+                showlegend=True,
+                height=550,
+                hovermode="closest"
             )
-            figure.tight_layout()
-            st.pyplot(figure)
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
             st.caption(
                 "Shares are calculated from the absolute signed energy totals. "
                 "Energy is estimated by multiplying each power measurement (MW) "
@@ -204,28 +234,64 @@ else:
                 month_data["timestamp"] = month_data["timestamp"].dt.tz_convert(
                     "Europe/Oslo"
                 )
-                figure, axis = plt.subplots(figsize=(9, 5))
+                # Create interactive time series chart
+                fig = go.Figure()
+
                 for (from_zone, to_zone), direction_data in month_data.groupby(
                     ["from_zone", "to_zone"]
                 ):
-                    direction_data = direction_data.sort_values("timestamp")
-                    axis.plot(
-                        direction_data["timestamp"],
-                        direction_data["flow_mw"],
-                        label=f"{from_zone} → {to_zone}",
-                    )
 
-                axis.set_title(
-                    f"Physical electricity flows — "
-                    f"{selected_connection[0]} / {selected_connection[1]}"
+                    direction_data = direction_data.sort_values("timestamp")
+
+                    fig.add_trace(
+                    go.Scatter(
+                        x=direction_data["timestamp"],
+                        y=direction_data["flow_mw"],
+                        mode="lines",
+                        name=f"{from_zone} → {to_zone}",
+                        line=dict(
+                            width=1.2,
+                            color=(
+                                PLOTLY_COLORS["secondary"]
+                                if from_zone.startswith("NO_")
+                                else PLOTLY_COLORS["electricity"]
+                            )
+                        ),
+                        hovertemplate=(
+                            "Date: %{x|%d/%m/%Y %H:%M}<br>"
+                            "Physical flow: %{y:.2f} MW"
+                            "<extra></extra>"
+                        )
+                    )
                 )
-                axis.set_xlabel("Date and time")
-                axis.set_ylabel("Physical flow (MW)")
-                axis.grid(True, alpha=0.3)
-                axis.legend()
-                figure.autofmt_xdate()
-                figure.tight_layout()
-                st.pyplot(figure)
+
+                fig = apply_plotly_theme(fig)
+
+                fig.update_layout(
+                    title=dict(
+                        text="Physical electricity flows",
+                        x=0.5,
+                        xanchor="center",
+                        font=dict(size=18)
+                    ),
+                    margin=dict(
+                        l=50,
+                        r=30,
+                        t=70,
+                        b=50
+                    ),
+                    xaxis_title="Date and time",
+                    yaxis_title="Physical flow (MW)",
+                    legend_title="Direction",
+                    height=650
+                )
+                st.caption(
+                    f"Connection: {selected_connection[0]} ↔ {selected_connection[1]}"
+                )
+                st.plotly_chart(
+                    fig,
+                    use_container_width=True
+                )
 
 with st.expander("About these data"):
     st.write(

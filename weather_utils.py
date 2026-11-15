@@ -14,7 +14,7 @@ from scipy.fft import dct, idct
 from sklearn.neighbors import LocalOutlierFactor
 
 import plotly.graph_objects as go
-
+from analysis_utils import PLOTLY_COLORS
 
 # --------------------------------------------------
 # MONGODB CONNECTION
@@ -182,7 +182,10 @@ def detect_temperature_outliers(
             y=temperature_mean["temperature_2m"],
             mode="lines",
             name="Average temperature",
-            line=dict(width=1),
+            line=dict(
+                color=PLOTLY_COLORS["temperature"],
+                width=1.5
+            ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
                 "Temperature: %{y:.2f} °C"
@@ -199,8 +202,8 @@ def detect_temperature_outliers(
             mode="markers",
             name="LOF outliers",
             marker=dict(
-                color="red",
-                size=6
+                color=PLOTLY_COLORS["anomaly"],
+                size=7
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
@@ -218,7 +221,7 @@ def detect_temperature_outliers(
         xaxis_title="Date",
         yaxis_title="Temperature (°C)",
         hovermode="x unified",
-        template="plotly_white",
+        template="plotly_dark",
         height=550,
         legend=dict(
             orientation="h",
@@ -341,7 +344,10 @@ def detect_precipitation_outliers(
             y=precipitation_mean["precipitation"],
             mode="lines",
             name="Average precipitation",
-            line=dict(width=1),
+            line=dict(
+                color=PLOTLY_COLORS["precipitation"],
+                width=1.5
+            ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
                 "Precipitation: %{y:.3f} mm"
@@ -358,8 +364,8 @@ def detect_precipitation_outliers(
             mode="markers",
             name="Outliers",
             marker=dict(
-                color="red",
-                size=6
+                color=PLOTLY_COLORS["anomaly"],
+                size=7
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
@@ -373,7 +379,7 @@ def detect_precipitation_outliers(
     figure.add_hline(
         y=upper_limit,
         line_dash="dash",
-        line_color="red",
+        line_color=PLOTLY_COLORS["anomaly"],
         annotation_text="UCL"
     )
 
@@ -381,7 +387,7 @@ def detect_precipitation_outliers(
     figure.add_hline(
         y=lower_limit,
         line_dash="dash",
-        line_color="red",
+        line_color=PLOTLY_COLORS["anomaly"],
         annotation_text="LCL"
     )
 
@@ -393,7 +399,7 @@ def detect_precipitation_outliers(
         xaxis_title="Date",
         yaxis_title="Precipitation (mm)",
         hovermode="x unified",
-        template="plotly_white",
+        template="plotly_dark",
         height=550,
         legend=dict(
             orientation="h",

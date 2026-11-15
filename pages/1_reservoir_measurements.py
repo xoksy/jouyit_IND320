@@ -26,10 +26,15 @@ except (requests.RequestException, ValueError) as error:
     st.stop()
 
 area_types = available_area_types(reservoirs)
+# Shared area type selection
+if st.session_state.get("selected_area_type") not in area_types:
+    st.session_state.selected_area_type = area_types[0]
+
 selected_type = st.radio(
     "Area type",
     options=area_types,
     horizontal=True,
+    key="selected_area_type"
 )
 
 area_data = filter_reservoirs(reservoirs, area_type=selected_type)

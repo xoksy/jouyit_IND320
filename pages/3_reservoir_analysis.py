@@ -1,9 +1,12 @@
-from matplotlib.pyplot import figure
 import streamlit as st
 import pandas as pd
 
 from app_utils import load_reservoirs, filter_reservoirs
-from analysis_utils import plot_stl_decomposition, plot_spectrogram
+from analysis_utils import (
+    plot_stl_decomposition,
+    plot_spectrogram,
+    apply_plotly_theme
+)
 
 st.set_page_config(page_title="Reservoir analysis", layout="wide")
 
@@ -13,15 +16,41 @@ st.write("Explore the seasonal and frequency characteristics of reservoir fillin
 # Load reservoir data
 reservoirs = load_reservoirs()
 
-# Select area type
+# Area type
 area_types = sorted(reservoirs["area_type"].dropna().unique())
-selected_type = st.selectbox("Area type", area_types)
 
-# Select area number
-available_areas = sorted(
-    reservoirs.loc[reservoirs["area_type"] == selected_type, "area_number"].dropna().unique()
+selected_type = st.selectbox(
+    "Area type",
+    options=area_types,
+    index=area_types.index(st.session_state.shared_area_type)
+    if st.session_state.shared_area_type in area_types else 0,
+    key="analysis_area_type"
 )
-selected_area = st.selectbox("Area number", available_areas)
+
+st.session_state.shared_area_type = selected_type
+
+# Available areas
+available_areas = sorted(
+    reservoirs.loc[
+        reservoirs["area_type"] == selected_type,
+        "area_number"
+    ].dropna().unique()
+)
+
+if not available_areas:
+    st.warning("No areas available for this area type.")
+    st.stop()
+
+if st.session_state.shared_area_number not in available_areas:
+    st.session_state.shared_area_number = available_areas[0]
+
+selected_area = st.selectbox(
+    "Area number",
+    options=available_areas,
+    index=available_areas.index(st.session_state.shared_area_number),
+    key="analysis_area_number"
+)
+st.session_state.shared_area_number = selected_area
 
 # Filter data
 data = filter_reservoirs(
@@ -52,6 +81,8 @@ with tab1:
             trend=int(trend),
             robust=robust
         )
+        fig = apply_plotly_theme(fig)
+
         st.plotly_chart(
             fig,
             use_container_width=True
@@ -71,6 +102,8 @@ with tab2:
             window_length=int(window_length),
             window_overlap=int(window_overlap)
         )
+        fig = apply_plotly_theme(fig)
+
         st.plotly_chart(
             fig,
             use_container_width=True

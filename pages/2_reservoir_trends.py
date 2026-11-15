@@ -1,4 +1,5 @@
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from analysis_utils import apply_plotly_theme, PLOTLY_COLORS
 import requests
 import streamlit as st
 
@@ -24,12 +25,44 @@ except (requests.RequestException, ValueError) as error:
     st.error(f"Unable to load reservoir data from the NVE API: {error}")
     st.stop()
 
+# --------------------------------------------------
+# AREA SELECTION
+# --------------------------------------------------
 area_types = available_area_types(reservoirs)
+
 selected_type = st.radio(
     "Area type",
     options=area_types,
+    index=area_types.index(st.session_state.shared_area_type)
+    if st.session_state.shared_area_type in area_types else 0,
     horizontal=True,
+    key="trends_area_type"
 )
+
+# Update shared area type
+st.session_state.shared_area_type = selected_type
+
+# Available areas
+available_areas = sorted(
+    reservoirs.loc[
+        reservoirs["area_type"] == selected_type,
+        "area_number"
+    ].dropna().unique()
+)
+
+# Keep selected area valid
+if st.session_state.shared_area_number not in available_areas:
+    st.session_state.shared_area_number = available_areas[0]
+
+selected_area = st.selectbox(
+    "Area number",
+    options=available_areas,
+    index=available_areas.index(st.session_state.shared_area_number),
+    key="trends_area_number"
+)
+# Update shared area number
+st.session_state.shared_area_number = selected_area
+
 
 minimum_date = reservoirs["date_id"].min().date()
 maximum_date = reservoirs["date_id"].max().date()
@@ -50,6 +83,11 @@ area_data = load_reservoirs_for_period(
     end_date=end_date,
     area_type=selected_type,
 )
+
+area_data = area_data[
+    area_data["area_number"] == selected_area
+].copy()
+
 columns = numeric_columns(area_data)
 if not columns:
     st.info(f"No numeric measurements are available for area type {selected_type}.")
@@ -65,24 +103,48 @@ if monthly.empty:
     st.info("No monthly measurements are available for this interval.")
     st.stop()
 
-figure, axis = plt.subplots(figsize=(12, 6))
+# --------------------------------------------------
+# CREATE INTERACTIVE PLOTLY CHART
+# --------------------------------------------------
+
+fig = go.Figure()
+
 for area_number in monthly.columns:
+
     series = monthly[area_number].dropna()
+
     if not series.empty:
-        axis.plot(
-            series.index,
-            series,
-            label=f"Area {area_number}",
-            linewidth=1.8,
+
+        fig.add_trace(
+            go.Scatter(
+                x=series.index,
+                y=series,
+                mode="lines",
+                name=f"Area {area_number}",
+                line=dict(width=2),
+                hovertemplate=(
+                    "Date: %{x|%b %Y}<br>"
+                    "Value: %{y:.3f}"
+                    "<extra></extra>"
+                )
+            )
         )
 
-axis.set_title(
-    f"{selected_column.replace('_', ' ').capitalize()} by area number ({selected_type})"
+# Apply common theme
+fig = apply_plotly_theme(
+    fig,
+    title=f"{selected_column.replace('_', ' ').capitalize()} – {selected_type} {selected_area}"
 )
-axis.set_xlabel("Month")
-axis.set_ylabel(selected_column.replace("_", " ").capitalize())
-axis.grid(alpha=0.3)
-axis.legend(title="Area number")
-figure.autofmt_xdate()
-figure.tight_layout()
-st.pyplot(figure)
+
+fig.update_layout(
+    xaxis_title="Month",
+    yaxis_title=selected_column.replace("_", " ").capitalize(),
+    showlegend=False,
+    height=600
+)
+
+# Display chart
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)

@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from analysis_utils import apply_plotly_theme
 
 from weather_utils import (
     available_weather_zones,
@@ -117,6 +118,8 @@ with tab1:
                     n_std=float(n_std),
                 )
 
+            figure = apply_plotly_theme(figure)
+
             st.plotly_chart(
                 figure,
                 use_container_width=True
@@ -207,6 +210,8 @@ with tab2:
                     n_neighbors=int(n_neighbors),
                 )
 
+            figure = apply_plotly_theme(figure)
+            
             st.plotly_chart(
                 figure,
                 use_container_width=True

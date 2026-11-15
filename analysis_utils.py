@@ -230,3 +230,57 @@ def plot_spectrogram(
     )
 
     return figure
+
+# --------------------------------------------------
+# PLOTLY THEME
+# --------------------------------------------------
+
+PLOTLY_COLORS = {
+    "reservoir": "#2DD4BF",
+    "electricity": "#F59E0B",
+    "temperature": "#60A5FA",
+    "precipitation": "#A78BFA",
+    "forecast": "#4ADE80",
+    "secondary": "#22D3EE",
+    "anomaly": "#F87171"
+}
+
+def apply_plotly_theme(fig, title=None):
+    """
+    Apply the common visual theme to Plotly figures.
+    """
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#101827",
+        plot_bgcolor="#192538",
+        font=dict(
+            color="#F1F5F9",
+            family="Arial"
+        ),
+        margin=dict(l=60, r=30, t=80, b=50),
+        hovermode="x unified"
+    )
+
+    if title is not None:
+        fig.update_layout(
+            title=dict(
+                text=title,
+                x=0.5,
+                xanchor="center"
+            )
+        )
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="#334155",
+        zeroline=False
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor="#334155",
+        zeroline=False
+    )
+
+    return fig
