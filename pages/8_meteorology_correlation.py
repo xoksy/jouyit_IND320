@@ -71,6 +71,59 @@ def get_reservoirs_2024():
 
     return reservoirs
 
+def aggregate_weather_weekly(weather):
+    weather = weather.copy()
+
+    # Convert UTC timestamps to Norwegian local time
+    weather["timestamp"] = (
+        weather["timestamp"].dt.tz_convert("Europe/Oslo")
+    )
+
+    # Aggregate geographical points for each timestamp
+    hourly = (
+        weather.groupby("timestamp")
+        .agg({
+            "temperature_2m": "mean",
+            "precipitation": "mean"
+        })
+        .reset_index()
+    )
+
+    # Extract ISO year and week
+    iso_calendar = hourly["timestamp"].dt.isocalendar()
+
+    hourly["iso_year"] = iso_calendar.year
+    hourly["iso_week"] = iso_calendar.week
+
+    # Weekly aggregation
+    weekly = (
+        hourly.groupby(["iso_year", "iso_week"])
+        .agg({
+            "temperature_2m": "mean",
+            "precipitation": "sum"
+        })
+        .reset_index()
+    )
+
+    return weekly
+
+
+def aggregate_reservoir_weekly(reservoirs):
+    reservoirs = reservoirs.copy()
+
+    # Keep one average value per ISO week
+    weekly = (
+        reservoirs.groupby(["iso_year", "iso_week"])
+        .agg({
+            "filling_degree": "mean",
+            "filling_TWh": "mean",
+            "capacity_TWh": "mean",
+            "change_in_filling_degree": "mean"
+        })
+        .reset_index()
+    )
+
+    return weekly
 
 # --------------------------------------------------
 # FILTER DATA FOR SELECTED ZONE
@@ -93,15 +146,50 @@ except Exception as error:
 
 
 # --------------------------------------------------
-# DISPLAY DATA
+# WEEKLY AGGREGATION
 # --------------------------------------------------
 
-st.subheader(f"Weather data — {zone}")
+weather_weekly = aggregate_weather_weekly(weather_df)
 
-st.write(f"Number of weather observations: {len(weather_df)}")
-st.dataframe(weather_df.head())
+reservoirs_weekly = aggregate_reservoir_weekly(
+    reservoirs_zone
+)
 
-st.subheader(f"Reservoir data — {zone}")
+# --------------------------------------------------
+# ALIGN WEATHER AND RESERVOIR DATA
+# --------------------------------------------------
 
-st.write(f"Number of reservoir observations: {len(reservoirs_zone)}")
-st.dataframe(reservoirs_zone.head())
+merged_df = pd.merge(
+    weather_weekly,
+    reservoirs_weekly,
+    on=["iso_year", "iso_week"],
+    how="inner"
+)
+
+# --------------------------------------------------
+# DISPLAY RESULTS
+# --------------------------------------------------
+
+st.subheader(f"Weekly weather data — {zone}")
+
+st.write(
+    f"Number of weeks: {len(weather_weekly)}"
+)
+
+st.dataframe(weather_weekly)
+
+st.subheader(f"Weekly reservoir data — {zone}")
+
+st.write(
+    f"Number of weeks: {len(reservoirs_weekly)}"
+)
+
+st.dataframe(reservoirs_weekly)
+
+st.subheader("Combined dataset")
+
+st.write(
+    f"Number of matched weeks: {len(merged_df)}"
+)
+
+st.dataframe(merged_df)
