@@ -12,7 +12,7 @@ from gridfs import GridFSBucket
 
 from scipy.fft import dct, idct
 from sklearn.neighbors import LocalOutlierFactor
-
+from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
 from analysis_utils import PLOTLY_COLORS
 
@@ -239,7 +239,39 @@ def detect_temperature_outliers(
         )
 
     # 4. Prepare data for LOF
-    X = valid_data[[column]]
+
+    if weather_property == "Temperature":
+
+        # Temperature: use the original values
+        X = valid_data[[column]].copy()
+
+    else:
+
+        # Precipitation: create temporal features
+        X = pd.DataFrame(index=valid_data.index)
+
+        # Current precipitation (log transformation)
+        X["precipitation"] = np.log1p(
+            valid_data["precipitation"]
+        )
+
+        # Rolling precipitation accumulation over 6 hours
+        X["precipitation_6h"] = np.log1p(
+            valid_data["precipitation"]
+            .rolling(window=6, min_periods=1)
+            .sum()
+        )
+
+        # Rolling precipitation accumulation over 24 hours
+        X["precipitation_24h"] = np.log1p(
+            valid_data["precipitation"]
+            .rolling(window=24, min_periods=1)
+            .sum()
+        )
+
+    # Standardize features before applying LOF
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
 
     # 5. Initialize and apply LOF
     lof = LocalOutlierFactor(
@@ -247,7 +279,7 @@ def detect_temperature_outliers(
         n_neighbors=n_neighbors
     )
 
-    lof_labels = lof.fit_predict(X)
+    lof_labels = lof.fit_predict(X_scaled)
 
     # 6. Identify outliers
     valid_data["is_outlier"] = lof_labels == -1
