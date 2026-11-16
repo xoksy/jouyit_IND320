@@ -436,13 +436,11 @@ def detect_precipitation_outliers(
         property_mean["is_outlier"]
     ].copy()
 
-    # 8. Project SPC boundaries onto the original precipitation scale
-    precipitation_median = np.median(values)
+    # 8. Project SPC boundaries onto the original weather scale
+    baseline = values - satv
 
-    lower_limit = precipitation_median - n_std * robust_std
-    upper_limit = precipitation_median + n_std * robust_std
-
-    property_mean["is_outlier"] = outlier_mask
+    lower_limit_curve = baseline + satv_lower_limit
+    upper_limit_curve = baseline + satv_upper_limit
 
     # 9. Extract outlier observations
     outliers_df = property_mean[
@@ -491,19 +489,33 @@ def detect_precipitation_outliers(
     )
 
     # Upper control limit
-    figure.add_hline(
-        y=upper_limit,
-        line_dash="dash",
-        line_color=PLOTLY_COLORS["anomaly"],
-        annotation_text="UCL"
+    figure.add_trace(
+        go.Scatter(
+            x=property_mean["timestamp"],
+            y=upper_limit_curve,
+            mode="lines",
+            name="Upper control limit (UCL)",
+            line=dict(
+                color=PLOTLY_COLORS["anomaly"],
+                width=1.5,
+                dash="dash"
+            )
+        )
     )
 
     # Lower control limit
-    figure.add_hline(
-        y=lower_limit,
-        line_dash="dash",
-        line_color=PLOTLY_COLORS["anomaly"],
-        annotation_text="LCL"
+    figure.add_trace(
+        go.Scatter(
+            x=property_mean["timestamp"],
+            y=lower_limit_curve,
+            mode="lines",
+            name="Lower control limit (LCL)",
+            line=dict(
+                color=PLOTLY_COLORS["anomaly"],
+                width=1.5,
+                dash="dash"
+            )
+        )
     )
 
     figure.update_layout(
@@ -533,8 +545,8 @@ def detect_precipitation_outliers(
         "n_std": n_std,
         "median": satv_median,
         "MAD": satv_mad,
-        "lower_limit": lower_limit,
-        "upper_limit": upper_limit,
+        "lower_limit": float(np.median(lower_limit_curve)),
+        "upper_limit": float(np.median(upper_limit_curve)),     
         "number_of_outliers": len(outliers_df),
         "percentage_of_outliers": (
             outlier_mask.mean() * 100
