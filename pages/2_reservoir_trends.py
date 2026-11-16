@@ -14,7 +14,8 @@ st.set_page_config(page_title="Reservoir trends", layout="wide")
 
 st.title("Reservoir trends")
 st.write(
-    "Compare a selected reservoir measurement across area numbers over time."
+    "Explore the evolution of a selected reservoir measurement "
+    "over time for the selected area."
 )
 
 try:

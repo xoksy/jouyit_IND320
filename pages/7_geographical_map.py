@@ -156,7 +156,7 @@ if display_by == "Price area":
     if area_type == "EL":
         values = {i: f"NO{i}" for i in range(1, 6)}
         value_label = "Electricity price area"
-        legend_text = "Areas are identified by their bidding-zone code. Numeric electricity spot prices are not connected to this app yet."
+        legend_text = "Areas are identified by their bidding-zone code."
     else:
         st.info("Price-area colouring is only meaningful for the five EL electricity bidding zones. The map will show the selected geographical outline without price values.")
 elif display_by == "Water area":
