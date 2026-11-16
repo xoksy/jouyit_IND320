@@ -118,6 +118,63 @@ def load_weather_data(region_id):
 
     return weather_df
 
+# --------------------------------------------------
+# LOAD ONLY ONE WEATHER VALUE FOR A SELECTED DATE
+# --------------------------------------------------
+
+@st.cache_data(ttl=3600)
+def load_weather_value_for_date(region_id, selected_date, column):
+
+    if column not in ["temperature_2m", "precipitation"]:
+        raise ValueError("Invalid weather column.")
+
+    bucket = get_weather_bucket()
+
+    filename = f"weather_{region_id}.parquet"
+
+    files = list(bucket.find({
+        "filename": filename,
+        "metadata.region": region_id
+    }))
+
+    if not files:
+        raise FileNotFoundError(
+            f"Weather data not found for {region_id}."
+        )
+
+    latest_file = max(
+        files,
+        key=lambda file: file.upload_date
+    )
+
+    # Download the file
+    with bucket.open_download_stream(latest_file._id) as stream:
+        file_data = stream.read()
+
+    # Read only the two required columns
+    weather_df = pd.read_parquet(
+        BytesIO(file_data),
+        columns=["timestamp", column]
+    )
+
+    # Release the downloaded file bytes
+    del file_data
+
+    weather_df["timestamp"] = pd.to_datetime(
+        weather_df["timestamp"],
+        utc=True
+    )
+
+    # Filter the selected date
+    daily_data = weather_df[
+        weather_df["timestamp"].dt.date == selected_date
+    ]
+
+    if daily_data.empty:
+        return None
+
+    # Return only one aggregated value
+    return float(daily_data[column].mean())
 
 # --------------------------------------------------
 # TEMPERATURE ANOMALIES — LOCAL OUTLIER FACTOR

@@ -7,7 +7,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from app_utils import load_reservoirs
-from weather_utils import load_weather_data
+from weather_utils import load_weather_value_for_date
 
 
 
@@ -49,22 +49,36 @@ def get_reservoir_values(area_type, selected_date):
 
 
 def get_weather_values(selected_date, property_name):
+
     values = {}
-    actual_dates = []
+
     zones = ["NO1", "NO2", "NO3", "NO4", "NO5"]
-    column = "temperature_2m" if property_name == "Temperature" else "precipitation"
-    for zone_number, zone in enumerate(zones, start=1):
+
+    column = (
+        "temperature_2m"
+        if property_name == "Temperature"
+        else "precipitation"
+    )
+
+    for zone in zones:
+
+        zone_number = int(zone[-1])
+
         try:
-            frame = load_weather_data(zone)
-            frame["timestamp"] = pd.to_datetime(frame["timestamp"])
-            day = frame[frame["timestamp"].dt.date == selected_date]
-            if day.empty or column not in day.columns:
-                continue
-            values[zone_number] = float(day[column].mean())
-            actual_dates.append(selected_date)
-        except Exception:
+
+            value = load_weather_value_for_date(
+                region_id=zone,
+                selected_date=selected_date,
+                column=column
+            )
+
+            if value is not None:
+                values[zone_number] = value
+
+        except FileNotFoundError:
             continue
-    return values, actual_dates
+
+    return values
 
 
 missing = [str(path) for path in GEO_FILES.values() if not path.exists()]
@@ -125,7 +139,10 @@ elif display_by == "Weather property":
     if area_type == "VASS":
         st.warning("Weather data is currently stored by electricity zone (NO1–NO5). A spatial aggregation onto VASS regions requires the underlying weather-point coordinates and a spatial join; this is not inferred from the region-name mapping.")
     else:
-        weather_values, _ = get_weather_values(selected_date, weather_property)
+        weather_values = get_weather_values(
+            selected_date,
+            weather_property
+        )
         if area_type == "EL":
             values = weather_values
         elif weather_values:
