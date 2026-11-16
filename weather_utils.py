@@ -176,28 +176,55 @@ def load_weather_value_for_date(region_id, selected_date, column):
     # Return only one aggregated value
     return float(daily_data[column].mean())
 
+
 # --------------------------------------------------
-# TEMPERATURE ANOMALIES — LOCAL OUTLIER FACTOR
+# WEATHER ANOMALIES — LOCAL OUTLIER FACTOR
 # --------------------------------------------------
 
 def detect_temperature_outliers(
     weather_df,
     region_id,
+    weather_property="Temperature",
     outlier_fraction=0.01,
     n_neighbors=20,
 ):
 
-    # 1. Calculate average temperature for each timestamp
-    temperature_mean = (
-        weather_df.groupby("timestamp")["temperature_2m"]
+    # 1. Select the weather variable
+    property_config = {
+        "Temperature": {
+            "column": "temperature_2m",
+            "label": "Temperature",
+            "unit": "°C",
+            "color": PLOTLY_COLORS["temperature"],
+        },
+        "Precipitation": {
+            "column": "precipitation",
+            "label": "Precipitation",
+            "unit": "mm",
+            "color": PLOTLY_COLORS["precipitation"],
+        },
+    }
+
+    if weather_property not in property_config:
+        raise ValueError("Invalid weather property.")
+
+    config = property_config[weather_property]
+
+    column = config["column"]
+    label = config["label"]
+    unit = config["unit"]
+
+    # 2. Calculate average value for each timestamp
+    property_mean = (
+        weather_df.groupby("timestamp")[column]
         .mean()
         .reset_index()
         .sort_values("timestamp")
     )
 
-    # 2. Remove missing temperature values for LOF
-    valid_data = temperature_mean.dropna(
-        subset=["temperature_2m"]
+    # 3. Remove missing values
+    valid_data = property_mean.dropna(
+        subset=[column]
     ).copy()
 
     # Check input parameters
@@ -211,10 +238,10 @@ def detect_temperature_outliers(
             "Not enough observations for the selected n_neighbors."
         )
 
-    # 3. Prepare data for LOF
-    X = valid_data[["temperature_2m"]]
+    # 4. Prepare data for LOF
+    X = valid_data[[column]]
 
-    # 4. Initialize and apply LOF
+    # 5. Initialize and apply LOF
     lof = LocalOutlierFactor(
         contamination=outlier_fraction,
         n_neighbors=n_neighbors
@@ -222,30 +249,30 @@ def detect_temperature_outliers(
 
     lof_labels = lof.fit_predict(X)
 
-    # 5. Identify outliers
+    # 6. Identify outliers
     valid_data["is_outlier"] = lof_labels == -1
 
     outliers_df = valid_data[
         valid_data["is_outlier"]
     ].copy()
 
-    # 6. Create interactive Plotly figure
+    # 7. Create interactive Plotly figure
     figure = go.Figure()
 
-    # Average temperature
+    # Average weather property
     figure.add_trace(
         go.Scatter(
-            x=temperature_mean["timestamp"],
-            y=temperature_mean["temperature_2m"],
+            x=property_mean["timestamp"],
+            y=property_mean[column],
             mode="lines",
-            name="Average temperature",
+            name=f"Average {label.lower()}",
             line=dict(
-                color=PLOTLY_COLORS["temperature"],
+                color=config["color"],
                 width=1.5
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
-                "Temperature: %{y:.2f} °C"
+                f"{label}: %{{y:.2f}} {unit}"
                 "<extra></extra>"
             )
         )
@@ -255,7 +282,7 @@ def detect_temperature_outliers(
     figure.add_trace(
         go.Scatter(
             x=outliers_df["timestamp"],
-            y=outliers_df["temperature_2m"],
+            y=outliers_df[column],
             mode="markers",
             name="LOF outliers",
             marker=dict(
@@ -264,7 +291,7 @@ def detect_temperature_outliers(
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
-                "Temperature: %{y:.2f} °C"
+                f"{label}: %{{y:.2f}} {unit}"
                 "<extra>LOF outlier</extra>"
             )
         )
@@ -272,11 +299,11 @@ def detect_temperature_outliers(
 
     figure.update_layout(
         title=(
-            f"Average hourly temperature and detected outliers "
-            f"— {region_id}"
+            f"Average hourly {label.lower()} "
+            f"and detected outliers — {region_id}"
         ),
         xaxis_title="Date",
-        yaxis_title="Temperature (°C)",
+        yaxis_title=f"{label} ({unit})",
         hovermode="x unified",
         template="plotly_dark",
         height=550,
@@ -289,9 +316,10 @@ def detect_temperature_outliers(
         )
     )
 
-    # 7. Create statistical summary
+    # 8. Create statistical summary
     summary = {
         "region": region_id,
+        "weather_property": weather_property,
         "outlier_fraction": outlier_fraction,
         "n_neighbors": n_neighbors,
         "number_of_observations": len(valid_data),
@@ -299,51 +327,69 @@ def detect_temperature_outliers(
         "percentage_of_outliers": (
             len(outliers_df) / len(valid_data) * 100
         ),
-        "mean_outlier_temperature": (
-            outliers_df["temperature_2m"].mean()
-        ),
-        "min_outlier_temperature": (
-            outliers_df["temperature_2m"].min()
-        ),
-        "max_outlier_temperature": (
-            outliers_df["temperature_2m"].max()
-        ),
+        "mean_outlier_value": outliers_df[column].mean(),
+        "min_outlier_value": outliers_df[column].min(),
+        "max_outlier_value": outliers_df[column].max(),
     }
 
     return figure, outliers_df, summary
 
 
 # --------------------------------------------------
-# PRECIPITATION OUTLIERS — DCT + ROBUST SPC
+# WEATHER ANOMALIES — DCT + ROBUST SPC (SATV)
 # --------------------------------------------------
 
 def detect_precipitation_outliers(
     weather_df,
     region_id,
+    weather_property="Temperature",
     cutoff=100,
     n_std=3,
 ):
 
-    # 1. Calculate average precipitation for each timestamp
-    precipitation_mean = (
-        weather_df.groupby("timestamp")["precipitation"]
+    # 1. Select the weather variable
+    property_config = {
+        "Temperature": {
+            "column": "temperature_2m",
+            "label": "Temperature",
+            "unit": "°C",
+            "color": PLOTLY_COLORS["temperature"],
+        },
+        "Precipitation": {
+            "column": "precipitation",
+            "label": "Precipitation",
+            "unit": "mm",
+            "color": PLOTLY_COLORS["precipitation"],
+        },
+    }
+
+    if weather_property not in property_config:
+        raise ValueError("Invalid weather property.")
+
+    config = property_config[weather_property]
+
+    column = config["column"]
+    label = config["label"]
+    unit = config["unit"]
+
+    # 2. Calculate average value for each timestamp
+    property_mean = (
+        weather_df.groupby("timestamp")[column]
         .mean()
         .reset_index()
         .sort_values("timestamp")
     )
 
-    # 2. Extract precipitation values
-    precipitation = precipitation_mean[
-        "precipitation"
-    ].to_numpy()
+    # 3. Extract values
+    values = property_mean[column].to_numpy()
 
     # Check that the series is valid
-    if len(precipitation) == 0 or not np.isfinite(precipitation).all():
+    if len(values) == 0 or not np.isfinite(values).all():
         raise ValueError(
-            "Precipitation data is empty or contains missing values."
+            f"{label} data is empty or contains missing values."
         )
 
-    if not 0 <= cutoff < len(precipitation):
+    if not 0 <= cutoff < len(values):
         raise ValueError(
             "cutoff must be between 0 and the number of observations."
         )
@@ -351,83 +397,84 @@ def detect_precipitation_outliers(
     if n_std <= 0:
         raise ValueError("n_std must be positive.")
 
-    # 3. Apply DCT high-pass filtering
-    precipitation_dct = dct(
-        precipitation,
+    # 4. Apply DCT high-pass filtering
+    values_dct = dct(
+        values,
         type=2,
         norm="ortho"
     )
 
-    precipitation_dct[:cutoff] = 0
+    values_dct[:cutoff] = 0
 
     satv = idct(
-        precipitation_dct,
+        values_dct,
         type=2,
         norm="ortho"
     )
 
-    # 4. Calculate robust statistics
+    # 5. Calculate robust statistics
     satv_median = np.median(satv)
+
     satv_mad = np.median(
         np.abs(satv - satv_median)
     )
 
     robust_std = 1.4826 * satv_mad
 
-    # 5. Calculate SPC boundaries
+    # 6. Calculate SPC boundaries
     lower_limit = satv_median - n_std * robust_std
     upper_limit = satv_median + n_std * robust_std
 
-    # 6. Identify outliers using SATV
+    # 7. Identify outliers using SATV
     outlier_mask = (
         (satv < lower_limit) |
         (satv > upper_limit)
     )
 
-    precipitation_mean["is_outlier"] = outlier_mask
+    property_mean["is_outlier"] = outlier_mask
 
-    # 7. Extract outlier observations
-    outliers_df = precipitation_mean[
-        precipitation_mean["is_outlier"]
+    # 8. Extract outlier observations
+    outliers_df = property_mean[
+        property_mean["is_outlier"]
     ].copy()
 
-    # 8. Create interactive Plotly figure
+    # 9. Create interactive Plotly figure
     figure = go.Figure()
 
-    # Average precipitation
+    # Average weather property
     figure.add_trace(
         go.Scatter(
-            x=precipitation_mean["timestamp"],
-            y=precipitation_mean["precipitation"],
+            x=property_mean["timestamp"],
+            y=property_mean[column],
             mode="lines",
-            name="Average precipitation",
+            name=f"Average {label.lower()}",
             line=dict(
-                color=PLOTLY_COLORS["precipitation"],
+                color=config["color"],
                 width=1.5
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
-                "Precipitation: %{y:.3f} mm"
+                f"{label}: %{{y:.2f}} {unit}"
                 "<extra></extra>"
             )
         )
     )
 
-    # Outliers
+    # SATV outliers
     figure.add_trace(
         go.Scatter(
             x=outliers_df["timestamp"],
-            y=outliers_df["precipitation"],
+            y=outliers_df[column],
             mode="markers",
-            name="Outliers",
+            name="SATV outliers",
             marker=dict(
                 color=PLOTLY_COLORS["anomaly"],
                 size=7
             ),
             hovertemplate=(
                 "Date: %{x|%d %b %Y %H:%M}<br>"
-                "Precipitation: %{y:.3f} mm"
-                "<extra>Outlier</extra>"
+                f"{label}: %{{y:.2f}} {unit}"
+                "<extra>SATV outlier</extra>"
             )
         )
     )
@@ -450,11 +497,11 @@ def detect_precipitation_outliers(
 
     figure.update_layout(
         title=(
-            f"Average hourly precipitation and detected outliers "
-            f"— {region_id} (2024) - cutoff={cutoff}, n_std={n_std}"
+            f"Average hourly {label.lower()} and detected outliers "
+            f"— {region_id} - cutoff={cutoff}, n_std={n_std}"
         ),
         xaxis_title="Date",
-        yaxis_title="Precipitation (mm)",
+        yaxis_title=f"{label} ({unit})",
         hovermode="x unified",
         template="plotly_dark",
         height=550,
@@ -467,9 +514,10 @@ def detect_precipitation_outliers(
         )
     )
 
-    # 9. Create statistical summary
+    # 10. Create statistical summary
     summary = {
         "region": region_id,
+        "weather_property": weather_property,
         "cutoff": cutoff,
         "n_std": n_std,
         "median": satv_median,
@@ -477,7 +525,9 @@ def detect_precipitation_outliers(
         "lower_limit": lower_limit,
         "upper_limit": upper_limit,
         "number_of_outliers": len(outliers_df),
-        "percentage_of_outliers": outlier_mask.mean() * 100,
+        "percentage_of_outliers": (
+            outlier_mask.mean() * 100
+        ),
     }
 
     return figure, outliers_df, summary

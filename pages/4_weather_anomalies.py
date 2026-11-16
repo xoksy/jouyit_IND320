@@ -69,8 +69,8 @@ with st.expander("Dataset information"):
 # --------------------------------------------------
 
 tab1, tab2 = st.tabs([
-    "Precipitation — SPC",
-    "Temperature — LOF",
+    "SATV — SPC",
+    "LOF",
 ])
 
 # ==================================================
@@ -79,7 +79,14 @@ tab1, tab2 = st.tabs([
 
 with tab1:
 
-    st.subheader("Precipitation anomaly detection")
+    st.subheader("SATV anomaly detection")
+
+    weather_property_satv = st.selectbox(
+        "Select weather property",
+        ["Temperature", "Precipitation"],
+        index=0,
+        key="satv_weather_property",
+    )
 
     st.write(
         "High-pass filtering using the Discrete Cosine Transform (DCT), "
@@ -106,14 +113,15 @@ with tab1:
             step=0.5,
         )
 
-    if st.button("Run precipitation analysis"):
+    if st.button("Run SATV analysis"):
 
         try:
-            with st.spinner("Detecting precipitation anomalies..."):
+            with st.spinner("Detecting anomalies..."):
 
                 figure, outliers_df, summary = detect_precipitation_outliers(
                     weather_df,
                     region_id=selected_zone,
+                    weather_property=weather_property_satv,
                     cutoff=int(cutoff),
                     n_std=float(n_std),
                 )
@@ -170,11 +178,18 @@ with tab1:
 
 with tab2:
 
-    st.subheader("Temperature anomaly detection")
+    st.subheader("LOF anomaly detection")
+
+    weather_property_lof = st.selectbox(
+        "Select weather property",
+        ["Temperature", "Precipitation"],
+        index=0,
+        key="lof_weather_property",
+    )
 
     st.write(
         "Local Outlier Factor (LOF) is used to identify "
-        "unusual temperature observations."
+        "unusual weather observations."
     )
 
     col1, col2 = st.columns(2)
@@ -198,14 +213,15 @@ with tab2:
             step=1,
         )
 
-    if st.button("Run temperature analysis"):
+    if st.button("Run LOF analysis"):
 
         try:
-            with st.spinner("Detecting temperature anomalies..."):
+            with st.spinner("Detecting anomalies..."):
 
                 figure, outliers_df, summary = detect_temperature_outliers(
                     weather_df,
                     region_id=selected_zone,
+                    weather_property=weather_property_lof,
                     outlier_fraction=float(outlier_fraction),
                     n_neighbors=int(n_neighbors),
                 )
@@ -236,21 +252,23 @@ with tab2:
                 f"{summary['percentage_of_outliers']:.2f}%"
             )
 
+            unit = "°C" if weather_property_lof == "Temperature" else "mm"
+
             col1, col2, col3 = st.columns(3)
 
             col1.metric(
-                "Mean outlier temperature",
-                f"{summary['mean_outlier_temperature']:.2f} °C"
+                f"Mean outlier {weather_property_lof.lower()}",
+                f"{summary['mean_outlier_value']:.2f} {unit}"
             )
 
             col2.metric(
-                "Minimum outlier temperature",
-                f"{summary['min_outlier_temperature']:.2f} °C"
+                f"Minimum outlier {weather_property_lof.lower()}",
+                f"{summary['min_outlier_value']:.2f} {unit}"
             )
 
             col3.metric(
-                "Maximum outlier temperature",
-                f"{summary['max_outlier_temperature']:.2f} °C"
+                f"Maximum outlier {weather_property_lof.lower()}",
+                f"{summary['max_outlier_value']:.2f} {unit}"
             )
 
             with st.expander("View detected outliers"):
