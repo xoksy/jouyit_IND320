@@ -16,20 +16,11 @@ st.write("Explore the seasonal and frequency characteristics of reservoir fillin
 # Load reservoir data
 reservoirs = load_reservoirs()
 
-# Area type
-area_types = sorted(reservoirs["area_type"].dropna().unique())
+# Retrieve area selection from Reservoir trends
+selected_type = st.session_state.shared_area_type
+selected_area = st.session_state.shared_area_number
 
-selected_type = st.selectbox(
-    "Area type",
-    options=area_types,
-    index=area_types.index(st.session_state.shared_area_type)
-    if st.session_state.shared_area_type in area_types else 0,
-    key="analysis_area_type"
-)
-
-st.session_state.shared_area_type = selected_type
-
-# Available areas
+# Check that the selected area is available
 available_areas = sorted(
     reservoirs.loc[
         reservoirs["area_type"] == selected_type,
@@ -38,19 +29,15 @@ available_areas = sorted(
 )
 
 if not available_areas:
-    st.warning("No areas available for this area type.")
+    st.warning(f"No areas available for area type {selected_type}.")
     st.stop()
 
-if st.session_state.shared_area_number not in available_areas:
-    st.session_state.shared_area_number = available_areas[0]
+if selected_area not in available_areas:
+    selected_area = available_areas[0]
+    st.session_state.shared_area_number = selected_area
 
-selected_area = st.selectbox(
-    "Area number",
-    options=available_areas,
-    index=available_areas.index(st.session_state.shared_area_number),
-    key="analysis_area_number"
-)
-st.session_state.shared_area_number = selected_area
+# Display current selection
+st.info(f"Current selection: {selected_type} — Area {selected_area}")
 
 # Filter data
 data = filter_reservoirs(

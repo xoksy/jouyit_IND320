@@ -62,7 +62,9 @@ selected_area = st.selectbox(
 )
 # Update shared area number
 st.session_state.shared_area_number = selected_area
-
+st.caption(
+    "This selection will also be used in Reservoir analysis."
+)
 
 minimum_date = reservoirs["date_id"].min().date()
 maximum_date = reservoirs["date_id"].max().date()

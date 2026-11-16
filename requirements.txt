@@ -9,3 +9,5 @@ pymongo
 python-dotenv
 pyarrow
 plotly
+folium
+streamlit-folium

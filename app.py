@@ -22,53 +22,27 @@ if "shared_area_number" not in st.session_state:
 # --------------------------------------------------
 
 pages = {
-
     "Home": [
-        st.Page(
-            "pages/0_home.py",
-            title="Home",
-            icon="🏠",
-            default=True
-        )
+        st.Page("pages/0_home.py", title="Home", icon="🏠", default=True)
     ],
 
     "Data Exploration": [
-        st.Page(
-            "pages/1_reservoir_measurements.py",
-            title="Reservoir measurements",
-            icon="💧"
-        ),
-        st.Page(
-            "pages/5_cross_border_flows.py",
-            title="Cross-border flows",
-            icon="⚡"
-        )
+        st.Page("pages/1_reservoir_measurements.py", title="Reservoir measurements", icon="💧"),
+        st.Page("pages/5_cross_border_flows.py", title="Cross-border flows", icon="⚡"),
+        st.Page("pages/7_geographical_map.py",    title="Geographical map", icon="🗺️")
     ],
 
     "Data Analysis": [
-        st.Page(
-            "pages/2_reservoir_trends.py",
-            title="Reservoir trends",
-            icon="📈"
-        ),
-        st.Page(
-            "pages/3_reservoir_analysis.py",
-            title="Reservoir analysis",
-            icon="🔬"
-        ),
-        st.Page(
-            "pages/4_weather_anomalies.py",
-            title="Weather anomalies",
-            icon="🌦️"
-        )
+        st.Page("pages/2_reservoir_trends.py", title="Reservoir trends", icon="📈"),
+        st.Page("pages/3_reservoir_analysis.py", title="Reservoir analysis", icon="🔬")
+    ],
+
+    "Advanced Analytics": [
+        st.Page("pages/4_weather_anomalies.py", title="Weather anomalies", icon="🌦️")
     ],
 
     "About": [
-        st.Page(
-            "pages/6_project_info.py",
-            title="Project information",
-            icon="ℹ️"
-        )
+        st.Page("pages/6_project_info.py", title="Project information", icon="ℹ️")
     ]
 }
 
