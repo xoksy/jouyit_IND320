@@ -9,78 +9,7 @@ from streamlit_folium import st_folium
 from app_utils import load_reservoirs
 from weather_utils import load_weather_data
 
-from weather_utils import (
-    available_weather_zones,
-    load_weather_data,
-)
 
-st.set_page_config(page_title="Geographical map", layout="wide")
-st.title("Geographical map")
-# --------------------------------------------------
-# 1. LOAD WEATHER DATA FROM MONGODB
-# --------------------------------------------------
-
-st.header("Weather data")
-
-# Retrieve available weather zones
-zones = available_weather_zones()
-
-if not zones:
-    st.warning("No weather data available in MongoDB.")
-    st.stop()
-
-# Load all available weather datasets
-weather_dfs = []
-
-with st.spinner("Loading weather data from MongoDB..."):
-
-    for zone in zones:
-
-        zone_df = load_weather_data(zone)
-
-        weather_dfs.append(zone_df)
-
-# Combine all zones into one DataFrame
-weather_df = pd.concat(
-    weather_dfs,
-    ignore_index=True
-)
-
-# Ensure timestamp is datetime
-weather_df["timestamp"] = pd.to_datetime(
-    weather_df["timestamp"],
-    utc=True
-)
-
-st.success(
-    f"{len(zones)} weather zones loaded successfully."
-)
-
-# Display dataset information
-col1, col2, col3 = st.columns(3)
-
-col1.metric(
-    "Number of records",
-    f"{len(weather_df):,}"
-)
-
-col2.metric(
-    "Geographical points",
-    weather_df["point_id"].nunique()
-)
-
-col3.metric(
-    "Weather zones",
-    len(zones)
-)
-
-# Display available dates
-st.write(
-    "Available period:",
-    weather_df["timestamp"].min(),
-    "to",
-    weather_df["timestamp"].max()
-)
 
 st.write(
     "Explore Norwegian electricity and reservoir areas. Select a map layer, "
