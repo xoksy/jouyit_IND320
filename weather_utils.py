@@ -250,23 +250,33 @@ def detect_temperature_outliers(
         # Precipitation: create temporal features
         X = pd.DataFrame(index=valid_data.index)
 
-        # Current precipitation (log transformation)
-        X["precipitation"] = np.log1p(
-            valid_data["precipitation"]
-        )
+        precipitation = valid_data["precipitation"]
+
+        # Current precipitation
+        X["precipitation"] = np.log1p(precipitation)
 
         # Rolling precipitation accumulation over 6 hours
         X["precipitation_6h"] = np.log1p(
-            valid_data["precipitation"]
-            .rolling(window=6, min_periods=1)
-            .sum()
+            precipitation.rolling(
+                window=6,
+                min_periods=1
+            ).sum()
         )
 
         # Rolling precipitation accumulation over 24 hours
         X["precipitation_24h"] = np.log1p(
-            valid_data["precipitation"]
-            .rolling(window=24, min_periods=1)
-            .sum()
+            precipitation.rolling(
+                window=24,
+                min_periods=1
+            ).sum()
+        )
+
+        # Maximum hourly precipitation over the last 6 hours
+        X["precipitation_6h_max"] = np.log1p(
+            precipitation.rolling(
+                window=6,
+                min_periods=1
+            ).max()
         )
 
     # Standardize features before applying LOF
