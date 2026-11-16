@@ -16,9 +16,16 @@ st.write("Explore the seasonal and frequency characteristics of reservoir fillin
 # Load reservoir data
 reservoirs = load_reservoirs()
 
-# Retrieve area selection from Reservoir trends
-selected_type = st.session_state.shared_area_type
-selected_area = st.session_state.shared_area_number
+# Retrieve area selection from Geographical map
+selected_type = st.session_state.get("shared_area_type")
+selected_area = st.session_state.get("shared_area_number")
+
+if selected_type is None or selected_area is None:
+    st.warning(
+        "No area selected. Please go to Geographical map "
+        "and click on an area first."
+    )
+    st.stop()
 
 # Check that the selected area is available
 available_areas = sorted(
@@ -33,8 +40,10 @@ if not available_areas:
     st.stop()
 
 if selected_area not in available_areas:
-    selected_area = available_areas[0]
-    st.session_state.shared_area_number = selected_area
+    st.warning(
+        f"Area {selected_area} is not available for area type {selected_type}."
+    )
+    st.stop()
 
 # Display current selection
 st.info(f"Current selection: {selected_type} — Area {selected_area}")

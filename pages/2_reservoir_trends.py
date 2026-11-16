@@ -4,9 +4,7 @@ import requests
 import streamlit as st
 
 from app_utils import (
-    available_area_types,
     load_reservoirs,
-    load_reservoirs_for_period,
     monthly_data,
     numeric_columns,
 )
@@ -28,43 +26,26 @@ except (requests.RequestException, ValueError) as error:
 # --------------------------------------------------
 # AREA SELECTION
 # --------------------------------------------------
-area_types = available_area_types(reservoirs)
+# Retrieve the area selected on the geographical map
+selected_type = st.session_state.get("shared_area_type")
+selected_area = st.session_state.get("shared_area_number")
 
-selected_type = st.radio(
-    "Area type",
-    options=area_types,
-    index=area_types.index(st.session_state.shared_area_type)
-    if st.session_state.shared_area_type in area_types else 0,
-    horizontal=True,
-    key="trends_area_type"
-)
+# Check that an area has been selected
+if selected_type is None or selected_area is None:
+    st.warning(
+        "No area selected. Please go to Geographical map "
+        "and click on an area first."
+    )
+    st.stop()
 
-# Update shared area type
-st.session_state.shared_area_type = selected_type
+# Display the current selection
+st.info(f"Current selection: {selected_type} – Area {selected_area}")
 
-# Available areas
-available_areas = sorted(
-    reservoirs.loc[
-        reservoirs["area_type"] == selected_type,
-        "area_number"
-    ].dropna().unique()
-)
-
-# Keep selected area valid
-if st.session_state.shared_area_number not in available_areas:
-    st.session_state.shared_area_number = available_areas[0]
-
-selected_area = st.selectbox(
-    "Area number",
-    options=available_areas,
-    index=available_areas.index(st.session_state.shared_area_number),
-    key="trends_area_number"
-)
-# Update shared area number
-st.session_state.shared_area_number = selected_area
-st.caption(
-    "This selection will also be used in Reservoir analysis."
-)
+# Filter data for the selected area
+area_data = reservoirs[
+    (reservoirs["area_type"] == selected_type)
+    & (reservoirs["area_number"] == selected_area)
+].copy()
 
 minimum_date = reservoirs["date_id"].min().date()
 maximum_date = reservoirs["date_id"].max().date()
@@ -80,11 +61,10 @@ st.caption(
     "records are included in the charts."
 )
 
-area_data = load_reservoirs_for_period(
-    start_date=start_date,
-    end_date=end_date,
-    area_type=selected_type,
-)
+area_data = area_data[
+    (area_data["date_id"].dt.date >= start_date)
+    & (area_data["date_id"].dt.date <= end_date)
+].copy()
 
 area_data = area_data[
     area_data["area_number"] == selected_area
@@ -135,7 +115,10 @@ for area_number in monthly.columns:
 # Apply common theme
 fig = apply_plotly_theme(
     fig,
-    title=f"{selected_column.replace('_', ' ').capitalize()} – {selected_type} {selected_area}"
+    title=(
+        f"{selected_column.replace('_', ' ').capitalize()} "
+        f"– {selected_type} Area {selected_area}"
+    )
 )
 
 fig.update_layout(

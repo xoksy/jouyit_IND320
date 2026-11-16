@@ -100,14 +100,43 @@ with col3:
 
 try:
     reservoirs = get_reservoir_data()
-    available_dates = sorted(pd.to_datetime(reservoirs["date_id"]).dt.date.unique())
+
+    # Available dates depend on the selected data source
+    if display_by == "Weather property":
+
+        available_dates = sorted(
+            pd.to_datetime(
+                reservoirs["date_id"]
+            ).dt.date.unique()
+        )
+
+        weather_start = pd.Timestamp("2024-01-01").date()
+        weather_end = pd.Timestamp("2024-12-31").date()
+
+        available_dates = [
+            date for date in available_dates
+            if weather_start <= date <= weather_end
+        ]
+
+    else:
+
+        available_dates = sorted(
+            pd.to_datetime(
+                reservoirs["date_id"]
+            ).dt.date.unique()
+        )
+
 except Exception as error:
-    st.error(f"Unable to retrieve Magasinstatistikk dates: {error}")
+    st.error(f"Unable to retrieve available dates: {error}")
     st.stop()
 
+
 if not available_dates:
-    st.warning("No reservoir dates are available.")
+    st.warning("No dates are available for this selection.")
     st.stop()
+
+
+# Date selector
 selected_date = st.select_slider(
     "Select date",
     options=available_dates,
