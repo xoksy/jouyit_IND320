@@ -421,24 +421,35 @@ def detect_precipitation_outliers(
 
     robust_std = 1.4826 * satv_mad
 
-    # 6. Calculate SPC boundaries
-    lower_limit = satv_median - n_std * robust_std
-    upper_limit = satv_median + n_std * robust_std
+    # 6. Calculate SPC boundaries on SATV
+    satv_lower_limit = satv_median - n_std * robust_std
+    satv_upper_limit = satv_median + n_std * robust_std
 
     # 7. Identify outliers using SATV
     outlier_mask = (
-        (satv < lower_limit) |
-        (satv > upper_limit)
+        (satv < satv_lower_limit) |
+        (satv > satv_upper_limit)
     )
-
     property_mean["is_outlier"] = outlier_mask
 
-    # 8. Extract outlier observations
     outliers_df = property_mean[
         property_mean["is_outlier"]
     ].copy()
 
-    # 9. Create interactive Plotly figure
+    # 8. Project SPC boundaries onto the original precipitation scale
+    precipitation_median = np.median(values)
+
+    lower_limit = precipitation_median - n_std * robust_std
+    upper_limit = precipitation_median + n_std * robust_std
+
+    property_mean["is_outlier"] = outlier_mask
+
+    # 9. Extract outlier observations
+    outliers_df = property_mean[
+        property_mean["is_outlier"]
+    ].copy()
+
+    # 10. Create interactive Plotly figure
     figure = go.Figure()
 
     # Average weather property
