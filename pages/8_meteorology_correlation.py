@@ -32,7 +32,6 @@ zone = st.selectbox(
 )
 
 
-
 # --------------------------------------------------
 # LOAD RESERVOIR DATA
 # --------------------------------------------------
@@ -177,19 +176,62 @@ with col2:
     )
 
 
-# Remove missing values
-correlation_data = merged_df[
-    [weather_variable, reservoir_variable]
+# --------------------------------------------------
+# TIME LAG SELECTION
+# --------------------------------------------------
+
+lag = st.slider(
+    "Weather time lag (weeks)",
+    min_value=0,
+    max_value=8,
+    value=0,
+    help=(
+        "A lag of 1 compares the weather from the previous week "
+        "with the reservoir level of the current week."
+    )
+)
+
+
+# --------------------------------------------------
+# APPLY TIME LAG
+# --------------------------------------------------
+
+lagged_data = merged_df.copy()
+
+# Sort observations chronologically
+lagged_data = lagged_data.sort_values(
+    ["iso_year", "iso_week"]
+).reset_index(drop=True)
+
+# Shift weather variable
+lagged_data["lagged_weather"] = (
+    lagged_data[weather_variable].shift(lag)
+)
+
+# Keep the reservoir variable unchanged
+correlation_data = lagged_data[
+    ["lagged_weather", reservoir_variable]
 ].dropna()
 
 
-# Calculate Pearson correlation
-correlation = correlation_data[
-    weather_variable
-].corr(
-    correlation_data[reservoir_variable],
-    method="pearson"
-)
+# --------------------------------------------------
+# CALCULATE PEARSON CORRELATION
+# --------------------------------------------------
+
+if (
+    len(correlation_data) < 2
+    or correlation_data["lagged_weather"].nunique() < 2
+    or correlation_data[reservoir_variable].nunique() < 2
+):
+    correlation = float("nan")
+
+else:
+    correlation = correlation_data[
+        "lagged_weather"
+    ].corr(
+        correlation_data[reservoir_variable],
+        method="pearson"
+    )
 
 
 # --------------------------------------------------
@@ -199,8 +241,18 @@ correlation = correlation_data[
 st.subheader("Pearson correlation coefficient")
 
 st.metric(
-    label="Correlation",
-    value=f"{correlation:.3f}"
+    label="Pearson correlation",
+    value=(
+        f"{correlation:.3f}"
+        if pd.notna(correlation)
+        else "N/A"
+    ),
+    help=f"Calculated using {len(correlation_data)} weekly observations."
+)
+
+st.caption(
+    f"Time lag: {lag} week(s) | "
+    f"Observations used: {len(correlation_data)}"
 )
 
 if correlation > 0.7:
@@ -225,15 +277,16 @@ else:
 
 figure = px.scatter(
     correlation_data,
-    x=weather_variable,
+    x="lagged_weather",
     y=reservoir_variable,
-    title="Weather vs Reservoir relationship",
+    title=f"Weather vs Reservoir relationship — Lag {lag} week(s)",
     labels={
         "temperature_2m": "Temperature (°C)",
         "precipitation": "Precipitation (mm)",
         "filling_degree": "Filling degree",
         "filling_TWh": "Filling volume (TWh)",
-        "change_in_filling_degree": "Weekly change in filling degree"
+        "change_in_filling_degree": "Weekly change in filling degree",
+        "lagged_weather": (f"{weather_variable} "f"({ 'lag: ' + str(lag) + ' week(s)' })"),
     },
     trendline=None
 )
