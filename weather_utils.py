@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-
+import tempfile
+import pyarrow.parquet as pq
 import os
 from io import BytesIO
 from urllib.parse import quote_plus
@@ -118,6 +119,162 @@ def load_weather_data(region_id):
 
     return weather_df
 
+# --------------------------------------------------
+# LOAD WEEKLY WEATHER DATA WITHOUT LOADING FULL DATASET
+# --------------------------------------------------
+
+@st.cache_data(ttl=3600)
+def load_weather_weekly(region_id, year=2024):
+
+    bucket = get_weather_bucket()
+
+    filename = f"weather_{region_id}.parquet"
+
+    # Retrieve only the most recent file metadata
+    files = list(
+        bucket.find({
+            "filename": filename,
+            "metadata.region": region_id
+        }).sort("uploadDate", -1).limit(1)
+    )
+
+    if not files:
+        raise FileNotFoundError(
+            f"Weather data not found for {region_id}."
+        )
+
+    latest_file = files[0]
+
+    # Download progressively to a temporary file
+    with tempfile.NamedTemporaryFile(
+        suffix=".parquet",
+        delete=False
+    ) as temp_file:
+
+        temp_path = temp_file.name
+
+        with bucket.open_download_stream(latest_file._id) as stream:
+
+            while True:
+                chunk = stream.read(8 * 1024 * 1024)
+
+                if not chunk:
+                    break
+
+                temp_file.write(chunk)
+
+    try:
+
+        parquet_file = pq.ParquetFile(temp_path)
+
+        required_columns = [
+            "timestamp",
+            "temperature_2m",
+            "precipitation"
+        ]
+
+        hourly_parts = []
+
+        # Process one Parquet row group at a time
+        for row_group in range(parquet_file.num_row_groups):
+
+            chunk = parquet_file.read_row_group(
+                row_group,
+                columns=required_columns
+            ).to_pandas()
+
+            chunk["timestamp"] = pd.to_datetime(
+                chunk["timestamp"],
+                utc=True
+            )
+
+            # Keep only the requested year
+            chunk = chunk[
+                chunk["timestamp"].dt.year == year
+            ]
+
+            if chunk.empty:
+                continue
+
+            # Aggregate geographical points by timestamp
+            hourly = (
+                chunk.groupby("timestamp")
+                .agg(
+                    temperature_sum=("temperature_2m", "sum"),
+                    temperature_count=("temperature_2m", "count"),
+                    precipitation_sum=("precipitation", "sum"),
+                    precipitation_count=("precipitation", "count")
+                )
+                .reset_index()
+            )
+
+            hourly_parts.append(hourly)
+
+            del chunk
+
+        if not hourly_parts:
+            raise ValueError(
+                f"No weather data available for {region_id} in {year}."
+            )
+
+        # Combine partial hourly aggregations
+        hourly = pd.concat(
+            hourly_parts,
+            ignore_index=True
+        )
+
+        hourly = (
+            hourly.groupby("timestamp")
+            .agg({
+                "temperature_sum": "sum",
+                "temperature_count": "sum",
+                "precipitation_sum": "sum",
+                "precipitation_count": "sum"
+            })
+            .reset_index()
+        )
+
+        # Calculate average across geographical points
+        hourly["temperature_2m"] = (
+            hourly["temperature_sum"]
+            / hourly["temperature_count"]
+        )
+
+        hourly["precipitation"] = (
+            hourly["precipitation_sum"]
+            / hourly["precipitation_count"]
+        )
+
+        # Convert timestamps to Norwegian local time
+        hourly["timestamp"] = (
+            hourly["timestamp"]
+            .dt.tz_convert("Europe/Oslo")
+        )
+
+        # Extract ISO year and week
+        iso_calendar = hourly["timestamp"].dt.isocalendar()
+
+        hourly["iso_year"] = iso_calendar.year
+        hourly["iso_week"] = iso_calendar.week
+
+        # Aggregate weekly data
+        weekly = (
+            hourly.groupby(["iso_year", "iso_week"])
+            .agg({
+                "temperature_2m": "mean",
+                "precipitation": "sum"
+            })
+            .reset_index()
+        )
+
+        return weekly
+
+    finally:
+
+        # Remove temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
 # --------------------------------------------------
 # LOAD ONLY ONE WEATHER VALUE FOR A SELECTED DATE
 # --------------------------------------------------

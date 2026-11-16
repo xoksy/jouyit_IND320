@@ -1,9 +1,9 @@
 import pandas as pd
 import streamlit as st
 
-from weather_utils import load_weather_data
+from weather_utils import load_weather_weekly
 from app_utils import load_reservoirs
-
+import plotly.express as px
 
 # --------------------------------------------------
 # PAGE CONFIGURATION
@@ -32,25 +32,6 @@ zone = st.selectbox(
 )
 
 
-# --------------------------------------------------
-# LOAD WEATHER DATA
-# --------------------------------------------------
-
-@st.cache_data
-def get_weather_2024(region):
-    weather = load_weather_data(region).copy()
-
-    weather["timestamp"] = pd.to_datetime(
-        weather["timestamp"],
-        utc=True
-    )
-
-    weather = weather[
-        weather["timestamp"].dt.year == 2024
-    ].copy()
-
-    return weather
-
 
 # --------------------------------------------------
 # LOAD RESERVOIR DATA
@@ -70,42 +51,6 @@ def get_reservoirs_2024():
     ].copy()
 
     return reservoirs
-
-def aggregate_weather_weekly(weather):
-    weather = weather.copy()
-
-    # Convert UTC timestamps to Norwegian local time
-    weather["timestamp"] = (
-        weather["timestamp"].dt.tz_convert("Europe/Oslo")
-    )
-
-    # Aggregate geographical points for each timestamp
-    hourly = (
-        weather.groupby("timestamp")
-        .agg({
-            "temperature_2m": "mean",
-            "precipitation": "mean"
-        })
-        .reset_index()
-    )
-
-    # Extract ISO year and week
-    iso_calendar = hourly["timestamp"].dt.isocalendar()
-
-    hourly["iso_year"] = iso_calendar.year
-    hourly["iso_week"] = iso_calendar.week
-
-    # Weekly aggregation
-    weekly = (
-        hourly.groupby(["iso_year", "iso_week"])
-        .agg({
-            "temperature_2m": "mean",
-            "precipitation": "sum"
-        })
-        .reset_index()
-    )
-
-    return weekly
 
 
 def aggregate_reservoir_weekly(reservoirs):
@@ -130,8 +75,13 @@ def aggregate_reservoir_weekly(reservoirs):
 # --------------------------------------------------
 
 try:
-    weather_df = get_weather_2024(zone)
+    # Load already aggregated weekly weather data
+    weather_weekly = load_weather_weekly(
+        region_id=zone,
+        year=2024
+    )
 
+    # Load reservoir data
     reservoirs_df = get_reservoirs_2024()
 
     zone_number = int(zone.replace("NO", ""))
@@ -149,12 +99,9 @@ except Exception as error:
 # WEEKLY AGGREGATION
 # --------------------------------------------------
 
-weather_weekly = aggregate_weather_weekly(weather_df)
-
 reservoirs_weekly = aggregate_reservoir_weekly(
     reservoirs_zone
 )
-
 # --------------------------------------------------
 # ALIGN WEATHER AND RESERVOIR DATA
 # --------------------------------------------------
@@ -193,3 +140,110 @@ st.write(
 )
 
 st.dataframe(merged_df)
+
+# --------------------------------------------------
+# CORRELATION ANALYSIS
+# --------------------------------------------------
+
+st.divider()
+
+st.header("Correlation analysis")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    weather_variable = st.selectbox(
+        "Weather variable",
+        ["temperature_2m", "precipitation"],
+        format_func=lambda x: {
+            "temperature_2m": "Temperature (°C)",
+            "precipitation": "Precipitation (mm)"
+        }[x]
+    )
+
+with col2:
+    reservoir_variable = st.selectbox(
+        "Reservoir indicator",
+        [
+            "filling_degree",
+            "filling_TWh",
+            "change_in_filling_degree"
+        ],
+        format_func=lambda x: {
+            "filling_degree": "Filling degree",
+            "filling_TWh": "Filling volume (TWh)",
+            "change_in_filling_degree": "Weekly change in filling degree"
+        }[x]
+    )
+
+
+# Remove missing values
+correlation_data = merged_df[
+    [weather_variable, reservoir_variable]
+].dropna()
+
+
+# Calculate Pearson correlation
+correlation = correlation_data[
+    weather_variable
+].corr(
+    correlation_data[reservoir_variable],
+    method="pearson"
+)
+
+
+# --------------------------------------------------
+# DISPLAY CORRELATION
+# --------------------------------------------------
+
+st.subheader("Pearson correlation coefficient")
+
+st.metric(
+    label="Correlation",
+    value=f"{correlation:.3f}"
+)
+
+if correlation > 0.7:
+    st.success("Strong positive correlation.")
+
+elif correlation > 0.3:
+    st.info("Moderate positive correlation.")
+
+elif correlation < -0.7:
+    st.success("Strong negative correlation.")
+
+elif correlation < -0.3:
+    st.info("Moderate negative correlation.")
+
+else:
+    st.warning("Weak or no linear correlation.")
+
+
+# --------------------------------------------------
+# SCATTER PLOT
+# --------------------------------------------------
+
+figure = px.scatter(
+    correlation_data,
+    x=weather_variable,
+    y=reservoir_variable,
+    title="Weather vs Reservoir relationship",
+    labels={
+        "temperature_2m": "Temperature (°C)",
+        "precipitation": "Precipitation (mm)",
+        "filling_degree": "Filling degree",
+        "filling_TWh": "Filling volume (TWh)",
+        "change_in_filling_degree": "Weekly change in filling degree"
+    },
+    trendline=None
+)
+
+figure.update_layout(
+    template="plotly_dark",
+    height=550
+)
+
+st.plotly_chart(
+    figure,
+    use_container_width=True
+)
