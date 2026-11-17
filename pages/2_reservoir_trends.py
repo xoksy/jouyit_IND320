@@ -40,7 +40,11 @@ if selected_type is None or selected_area is None:
     st.stop()
 
 # Display the current selection
-st.info(f"Current selection: {selected_type} – Area {selected_area}")
+display_area = 0 if selected_type == "NO" else selected_area
+
+st.info(
+    f"Current selection: {selected_type} – Area {display_area}"
+)
 
 # Filter data for the selected area
 # Map geographical selection to NVE area number
@@ -124,7 +128,7 @@ fig = apply_plotly_theme(
     fig,
     title=(
         f"{selected_column.replace('_', ' ').capitalize()} "
-        f"– {selected_type} Area {selected_area}"
+        f"– {selected_type} Area {display_area}"
     )
 )
 

@@ -260,8 +260,11 @@ if clicked:
         clicked_type = props.get("area_type", area_type)
         clicked_number = int(props.get("area_number", 1))
         st.session_state.shared_area_type = clicked_type
-        st.session_state.shared_area_number = clicked_number
-        st.success(f"Selected: {clicked_type} — Area {clicked_number}. This selection is shared with Reservoir trends and Reservoir analysis.")
+        display_area = 0 if clicked_type == "NO" else clicked_number
+        st.success(
+            f"Selected: {clicked_type} — Area {display_area}. "
+            "This selection is shared with Reservoir trends and Reservoir analysis."
+        )
     except (TypeError, ValueError):
         st.info("Area clicked, but its identifier could not be read.")
 
