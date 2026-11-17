@@ -30,7 +30,7 @@ except (requests.RequestException, ValueError) as error:
 # Retrieve the area selected on the geographical map
 selected_type = st.session_state.get("shared_area_type")
 selected_area = st.session_state.get("shared_area_number")
-st.write("DEBUG selection:", selected_type, selected_area)
+
 # Check that an area has been selected
 if selected_type is None or selected_area is None:
     st.warning(
