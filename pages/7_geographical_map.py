@@ -26,7 +26,7 @@ GEO_FILES = {
 }
 
 @st.cache_data
-def read_geojson(path: str):
+def read_geojson(path: str, file_modified_time: float):
     with open(path, encoding="utf-8") as file:
         return json.load(file)
 
@@ -164,7 +164,12 @@ st.caption(
     "as the historical training timeframe."
 )
 
-geojson = read_geojson(str(GEO_FILES[area_type]))
+geo_path = GEO_FILES[area_type]
+
+geojson = read_geojson(
+    str(geo_path),
+    geo_path.stat().st_mtime
+)
 features = geojson["features"]
 
 values = {}
