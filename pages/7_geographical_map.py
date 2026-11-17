@@ -12,9 +12,10 @@ from weather_utils import load_weather_value_for_date
 
 
 st.write(
-    "Explore Norwegian electricity and reservoir areas. Select a map layer, "
-    "a value to display, and a date. Click an area to share the selection "
-    "with the other reservoir pages."
+    "Explore Norwegian electricity and reservoir areas. "
+    "Select a map layer and a historical period. "
+    "The map displays values for the end date of the selected period. "
+    "Click an area to share the selection with the other pages."
 )
 
 GEO_DIR = Path(__file__).resolve().parents[1] / "geo"
@@ -137,29 +138,31 @@ if not available_dates:
     st.stop()
 
 
-# Date selector
-selected_date = st.select_slider(
-    "Select date",
-    options=available_dates,
-    value=available_dates[-1],
-    format_func=lambda value: value.strftime("%d %B %Y"),
-    key="map_selected_date",
-)
-# Observation interval for analysis and forecasting
-st.subheader("Observation interval")
+# Historical period selection
+st.subheader("Historical observation period")
 
 start_date, end_date = st.slider(
-    "Select training period",
+    "Select period",
     min_value=reservoir_dates[0],
-    max_value=reservoir_dates[-1],
-    value=(reservoir_dates[0], reservoir_dates[-1]),
+    max_value=available_dates[-1],
+    value=(reservoir_dates[0], available_dates[-1]),
     format="YYYY-MM-DD",
     key="map_observation_interval",
 )
 
-# Share the selected interval with other pages
+# The map displays values for the end date
+selected_date = end_date
+
+# Share dates with other pages
 st.session_state["map_start_date"] = start_date
 st.session_state["map_end_date"] = end_date
+st.session_state["map_selected_date"] = selected_date
+
+st.caption(
+    "The map displays reservoir values for the end date. "
+    "The full selected period is shared with the forecasting page "
+    "as the historical training timeframe."
+)
 
 geojson = read_geojson(str(GEO_FILES[area_type]))
 features = geojson["features"]
