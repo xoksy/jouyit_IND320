@@ -240,23 +240,16 @@ def highlight_function(_feature):
     return {"weight": 5, "color": "#FDE047", "fillOpacity": 0.5}
 
 # Centre map on Norway.
-# CartoDB Voyager provides a softly coloured geographic background
-# (land, sea, neighbouring countries and place names) while keeping
-# the thematic colours of the Norwegian areas clearly visible.
+# OpenStreetMap provides a complete geographic basemap without requiring
+# a third-party API key. It shows the surrounding countries, coastlines,
+# roads, cities and place names beneath the coloured Norwegian areas.
 map_object = folium.Map(
     location=[64.5, 14.5],
     zoom_start=4,
-    tiles="CartoDB Voyager",
+    tiles="OpenStreetMap",
     control_scale=True,
     prefer_canvas=True,
 )
-
-# Optional lighter background, selectable from the layer control.
-folium.TileLayer(
-    tiles="CartoDB positron",
-    name="Light background",
-    control=True,
-).add_to(map_object)
 
 # Thematic area layer: existing area colours and opacity are preserved.
 folium.GeoJson(
