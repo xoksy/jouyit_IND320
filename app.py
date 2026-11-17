@@ -39,7 +39,8 @@ pages = {
 
     "Advanced Analytics": [
         st.Page("pages/4_weather_anomalies.py", title="Weather anomalies", icon="🌦️"),
-        st.Page("pages/8_meteorology_correlation.py", title="Meteorology & Reservoir Correlation", icon="🔗")
+        st.Page("pages/8_meteorology_correlation.py", title="Meteorology & Reservoir Correlation", icon="🔗"),
+        st.Page("pages/9_reservoir_forecasting.py", title="Reservoir Forecasting", icon="📈")
     ],
 
     "About": [
