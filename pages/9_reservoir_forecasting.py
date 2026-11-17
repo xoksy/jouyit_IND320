@@ -682,25 +682,26 @@ if "reservoir_forecast" in st.session_state:
     # Historical data
     if using_weather:
 
-        # Full historical curve, displayed discreetly
-        forecast_fig.add_trace(
-            go.Scatter(
-                x=weekly_data.index,
-                y=weekly_data.values,
-                mode="lines",
-                name="Full historical filling",
-                line=dict(color="rgba(160, 170, 185, 0.25)", width=1.5)
-            )
+        # Keep only historical data from 2024 onwards
+        historical_after_2024 = weekly_data.copy()
+        historical_after_2024.index = pd.to_datetime(
+            historical_after_2024.index
         )
+        historical_after_2024 = historical_after_2024[
+            historical_after_2024.index >= "2024-01-01"
+        ]
 
-        # Highlight 2024 historical data
+        # Theoretical historical curve, displayed discreetly
         forecast_fig.add_trace(
             go.Scatter(
-                x=historical_data.index,
-                y=historical_data.values,
+                x=historical_after_2024.index,
+                y=historical_after_2024.values,
                 mode="lines",
-                name="Historical filling (2024)",
-                line=dict(color="#87CEFA", width=2.5)
+                name="Historical filling (reference)",
+                line=dict(
+                    color="rgba(160, 170, 185, 0.30)",
+                    width=1.5
+                )
             )
         )
 
