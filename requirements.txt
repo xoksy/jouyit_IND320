@@ -11,3 +11,4 @@ pyarrow
 plotly
 folium
 streamlit-folium
+river
