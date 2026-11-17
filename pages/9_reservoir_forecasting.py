@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from app_utils import load_reservoirs
 from river import time_series
 import numpy as np
+from weather_utils import load_weather_data
 
 # --------------------------------------------------
 # SNARIMAX FORECASTING
@@ -83,6 +84,45 @@ def forecast_reservoir_filling(
     })
 
     return forecast_df
+
+# --------------------------------------------------
+# PREPARE WEATHER DATA
+# --------------------------------------------------
+
+@st.cache_data(ttl=3600)
+def prepare_weather_data(region_id):
+
+    weather_df = load_weather_data(region_id).copy()
+
+    weather_df["timestamp"] = pd.to_datetime(
+        weather_df["timestamp"],
+        utc=True
+    )
+
+    # Keep 2024 only
+    weather_df = weather_df[
+        weather_df["timestamp"].dt.year == 2024
+    ].copy()
+
+    if weather_df.empty:
+        raise ValueError("No weather data available for 2024.")
+
+    # Extract ISO year and week
+    iso_dates = weather_df["timestamp"].dt.isocalendar()
+
+    weather_df["iso_year"] = iso_dates.year
+    weather_df["iso_week"] = iso_dates.week
+
+    # Aggregate weather data weekly
+    weekly_weather = weather_df.groupby(
+        ["iso_year", "iso_week"]
+    ).agg(
+        temperature_2m=("temperature_2m", "mean"),
+        precipitation=("precipitation", "sum")
+    ).reset_index()
+
+    return weekly_weather
+
 # --------------------------------------------------
 # PAGE CONFIGURATION
 # --------------------------------------------------
@@ -91,7 +131,7 @@ st.title("Reservoir Forecasting")
 
 st.write(
     "Forecast Norwegian reservoir filling using "
-    "statistical and machine learning models."
+    "the SNARIMAX model."
 )
 
 
@@ -247,14 +287,7 @@ st.plotly_chart(fig, use_container_width=True)
 # --------------------------------------------------
 
 st.divider()
-
 st.header("Forecast configuration")
-
-# Model selection
-model_type = st.selectbox(
-    "Forecasting model",
-    ["SNARIMAX (River)", "Machine Learning"]
-)
 
 # Forecast horizon
 st.subheader("Forecast horizon")
@@ -269,66 +302,147 @@ horizon_weeks = st.slider(
 
 
 # --------------------------------------------------
-# SNARIMAX PARAMETERS
+# SNARIMAX CONFIGURATION
 # --------------------------------------------------
 
-if model_type == "SNARIMAX (River)":
+st.subheader("Forecast horizon")
 
-    st.subheader("SNARIMAX parameters")
+horizon_weeks = st.slider(
+    "Number of weeks to forecast",
+    min_value=1,
+    max_value=52,
+    value=13,
+    help="Number of weeks to predict into the future."
+)
 
-    with st.expander("Advanced model parameters", expanded=True):
+st.subheader("SNARIMAX parameters")
 
-        col1, col2, col3 = st.columns(3)
+with st.expander("Advanced model parameters", expanded=True):
 
-        with col1:
-            p = st.number_input("p", 0, 5, 1)
-            d = st.number_input("d", 0, 2, 1)
-            q = st.number_input("q", 0, 5, 1)
+    col1, col2, col3 = st.columns(3)
 
-        with col2:
-            sp = st.number_input("sp", 0, 5, 1)
-            sd = st.number_input("sd", 0, 2, 1)
-            sq = st.number_input("sq", 0, 5, 0)
+    with col1:
+        p = st.number_input("p", 0, 5, 1)
+        d = st.number_input("d", 0, 2, 1)
+        q = st.number_input("q", 0, 5, 1)
 
-        with col3:
-            m = st.number_input(
-                "Seasonal period (m)",
-                min_value=1,
-                max_value=104,
-                value=52
+    with col2:
+        sp = st.number_input("sp", 0, 5, 1)
+        sd = st.number_input("sd", 0, 2, 1)
+        sq = st.number_input("sq", 0, 5, 0)
+
+    with col3:
+        m = st.number_input(
+            "Seasonal period (m)",
+            min_value=1,
+            max_value=104,
+            value=52
+        )
+
+st.info(
+    "Default parameters correspond to the optimal "
+    "SNARIMAX configuration identified in the Jupyter Notebook."
+)
+
+# --------------------------------------------------
+# EXOGENOUS WEATHER VARIABLES
+# --------------------------------------------------
+
+st.divider()
+
+st.subheader("Exogenous weather variables")
+
+st.caption(
+    "Weather data is available for 2024 only. "
+    "Select the weather variables to include in the model."
+)
+
+use_temperature = st.checkbox(
+    "Temperature (°C)",
+    value=False
+)
+
+use_precipitation = st.checkbox(
+    "Precipitation (mm)",
+    value=False
+)
+
+selected_weather_variables = []
+
+if use_temperature:
+    selected_weather_variables.append("temperature_2m")
+
+if use_precipitation:
+    selected_weather_variables.append("precipitation")
+
+# --------------------------------------------------
+# LOAD WEATHER DATA
+# --------------------------------------------------
+
+weekly_weather = None
+
+if selected_weather_variables:
+
+    if selected_type == "EL":
+
+        weather_region = f"NO{data_area_number}"
+
+    elif selected_type == "NO":
+
+        st.warning(
+            "Weather data for Norway must be aggregated "
+            "from the five electricity zones."
+        )
+        weather_region = None
+
+    else:
+
+        st.warning(
+            "Weather data is not directly available "
+            "for VASS areas."
+        )
+        weather_region = None
+
+    if weather_region is not None:
+
+        try:
+            weekly_weather = prepare_weather_data(
+                weather_region
             )
 
-    st.info(
-        "Default parameters correspond to the optimal "
-        "SNARIMAX configuration identified in the Jupyter Notebook."
-    )
+            st.success(
+                f"Weather data loaded for {weather_region}."
+            )
 
+            st.write(
+                f"Number of available weeks: {len(weekly_weather)}"
+            )
 
-elif model_type == "Machine Learning":
+            st.dataframe(
+                weekly_weather.head(10),
+                use_container_width=True
+            )
 
-    st.info(
-        "Machine Learning forecasting will be implemented "
-        "in the next development step."
-    )
-
-
+        except Exception as error:
+            st.error(
+                f"Unable to load weather data: {error}"
+            )
+            
 # --------------------------------------------------
 # FORECAST SUMMARY
 # --------------------------------------------------
 
 st.subheader("Configuration summary")
 
-st.write(f"**Model:** {model_type}")
+st.write("**Model:** SNARIMAX (River)")
 st.write(f"**Forecast horizon:** {horizon_weeks} weeks")
 st.write(f"**Training period:** {start_date} → {end_date}")
 
-if model_type == "SNARIMAX (River)":
-
-    st.write(
-        f"**Parameters:** "
-        f"(p={p}, d={d}, q={q}) "
-        f"(sp={sp}, sd={sd}, sq={sq}, m={m})"
-    )
+st.write(
+    f"**Parameters:** "
+    f"(p={p}, d={d}, q={q}) "
+    f"(sp={sp}, sd={sd}, sq={sq}, m={m})"
+)
 
 # --------------------------------------------------
 # RUN FORECAST
@@ -338,31 +452,29 @@ st.divider()
 
 st.subheader("Generate forecast")
 
-if model_type == "SNARIMAX (River)":
+if st.button("Run SNARIMAX forecast", type="primary"):
 
-    if st.button("Run SNARIMAX forecast", type="primary"):
+    try:
+        with st.spinner("Training SNARIMAX model..."):
 
-        try:
-            with st.spinner("Training SNARIMAX model..."):
+            forecast_df = forecast_reservoir_filling(
+                weekly_data=weekly_data / 100,
+                horizon_weeks=horizon_weeks,
+                p=p,
+                d=d,
+                q=q,
+                sp=sp,
+                sd=sd,
+                sq=sq,
+                m=m
+            )
 
-                forecast_df = forecast_reservoir_filling(
-                    weekly_data=weekly_data / 100,
-                    horizon_weeks=horizon_weeks,
-                    p=p,
-                    d=d,
-                    q=q,
-                    sp=sp,
-                    sd=sd,
-                    sq=sq,
-                    m=m
-                )
+        st.session_state["reservoir_forecast"] = forecast_df
 
-            st.session_state["reservoir_forecast"] = forecast_df
+        st.success("Forecast successfully generated!")
 
-            st.success("Forecast successfully generated!")
-
-        except Exception as error:
-            st.error(f"Forecasting error: {error}")
+    except Exception as error:
+        st.error(f"Forecasting error: {error}")
 
 # --------------------------------------------------
 # DISPLAY FORECAST
@@ -416,12 +528,5 @@ if "reservoir_forecast" in st.session_state:
         ).rename(columns={
             "predicted_filling_degree": "Predicted filling (%)"
         }),
-        use_container_width=True
-    )
-
-# Display prepared dataset
-with st.expander("View prepared dataset"):
-    st.dataframe(
-        weekly_data.rename("filling_degree (%)").to_frame(),
         use_container_width=True
     )
