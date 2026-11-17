@@ -20,19 +20,41 @@ def forecast_reservoir_filling(
     sp=1,
     sd=1,
     sq=0,
-    m=52
+    m=52,
+    weekly_weather=None,
+    weather_variables=None
 ):
 
-    # 1. Prepare the time series
     series = weekly_data.sort_index().dropna()
 
-    if len(series) < 2 * m:
+    use_weather = bool(weather_variables)
+
+    # --------------------------------------------------
+    # 1. Model configuration
+    # --------------------------------------------------
+
+    if use_weather:
+        # Only one year of weather data is available.
+        # Use calendar features instead of seasonal differencing.
+        model_sp = 0
+        model_sd = 0
+        model_sq = 0
+        model_m = 1
+
+    else:
+        model_sp = sp
+        model_sd = sd
+        model_sq = sq
+        model_m = m
+
+    # Minimum history
+    if len(series) < 2 * model_m:
         raise ValueError(
-            f"Not enough observations. At least {2*m} "
-            "weekly observations are required."
+            f"Not enough observations. At least "
+            f"{2 * model_m} weekly observations are required."
         )
 
-    # 2. Check weekly frequency
+    # Check weekly frequency
     intervals = series.index.to_series().diff().dropna()
 
     if not (intervals == pd.Timedelta(days=7)).all():
@@ -40,24 +62,125 @@ def forecast_reservoir_filling(
             "The selected region does not have a regular weekly frequency."
         )
 
+    # --------------------------------------------------
+    # 2. Prepare exogenous variables
+    # --------------------------------------------------
+
+    def build_weather_features(date):
+
+        iso_week = date.isocalendar().week
+
+        features = {
+            "week_sin": float(
+                np.sin(2 * np.pi * iso_week / 52)
+            ),
+            "week_cos": float(
+                np.cos(2 * np.pi * iso_week / 52)
+            )
+        }
+
+        if use_weather:
+
+            matching_week = weekly_weather[
+                weekly_weather["iso_week"] == iso_week
+            ]
+
+            if matching_week.empty:
+                raise ValueError(
+                    f"No weather data available for ISO week {iso_week}."
+                )
+
+            weather_row = matching_week.iloc[0]
+
+            for variable in weather_variables:
+                features[variable] = float(weather_row[variable])
+
+        return features
+
+    if use_weather:
+
+        if weekly_weather is None or weekly_weather.empty:
+            raise ValueError("Weather data is not available.")
+
+        # Check that all selected variables exist
+        missing_variables = [
+            variable
+            for variable in weather_variables
+            if variable not in weekly_weather.columns
+        ]
+
+        if missing_variables:
+            raise ValueError(
+                f"Missing weather variables: {missing_variables}"
+            )
+
+        # Build training features
+        training_features = [
+            build_weather_features(date)
+            for date in series.index
+        ]
+
+    else:
+        training_features = [
+            {
+                "week_sin": float(
+                    np.sin(2 * np.pi * date.isocalendar().week / 52)
+                ),
+                "week_cos": float(
+                    np.cos(2 * np.pi * date.isocalendar().week / 52)
+                )
+            }
+            for date in series.index
+        ]
+
+    # --------------------------------------------------
     # 3. Initialize SNARIMAX
+    # --------------------------------------------------
+
     model = time_series.SNARIMAX(
         p=p,
         d=d,
         q=q,
-        sp=sp,
-        sd=sd,
-        sq=sq,
-        m=m
+        sp=model_sp,
+        sd=model_sd,
+        sq=model_sq,
+        m=model_m
     )
 
+    # --------------------------------------------------
     # 4. Train the model
-    for value in series:
-        model.learn_one(float(value))
+    # --------------------------------------------------
 
-    # 5. Generate predictions
+    for value, features in zip(series, training_features):
+        model.learn_one(
+            float(value),
+            x=features
+        )
+
+    # --------------------------------------------------
+    # 5. Prepare future exogenous variables
+    # --------------------------------------------------
+
+    future_dates = pd.date_range(
+        start=series.index[-1] + pd.Timedelta(days=7),
+        periods=horizon_weeks,
+        freq="7D"
+    )
+
+    future_features = [
+        build_weather_features(date)
+        for date in future_dates
+    ]
+
+    # --------------------------------------------------
+    # 6. Generate forecast
+    # --------------------------------------------------
+
     predictions = list(
-        model.forecast(horizon= horizon_weeks)
+        model.forecast(
+            horizon=horizon_weeks,
+            xs=future_features
+        )
     )
 
     if len(predictions) != horizon_weeks:
@@ -70,14 +193,10 @@ def forecast_reservoir_filling(
 
     predictions = np.clip(predictions, 0, 1)
 
-    # 6. Generate future dates
-    future_dates = pd.date_range(
-        start=series.index[-1] + pd.Timedelta(days=7),
-        periods=horizon_weeks,
-        freq="7D"
-    )
-
+    # --------------------------------------------------
     # 7. Return forecast
+    # --------------------------------------------------
+
     forecast_df = pd.DataFrame({
         "date_id": future_dates,
         "predicted_filling_degree": predictions
@@ -440,9 +559,8 @@ if selected_weather_variables:
     if weather_region is not None:
 
         try:
-            weekly_weather = prepare_weather_data(
-                weather_region
-            )
+            with st.spinner(f"Loading weather data for {weather_region}..."):
+                weekly_weather = prepare_weather_data(weather_region)
 
             st.success(
                 f"Weather data loaded for {weather_region}."
@@ -491,6 +609,12 @@ st.divider()
 st.subheader("Generate forecast")
 
 if st.button("Run SNARIMAX forecast", type="primary"):
+    if selected_weather_variables and weekly_weather is None:
+        st.error(
+            "Weather data could not be loaded. "
+            "Please check the selected area and weather availability."
+        )
+        st.stop()
 
     try:
         with st.spinner("Training SNARIMAX model..."):
@@ -504,7 +628,9 @@ if st.button("Run SNARIMAX forecast", type="primary"):
                 sp=sp,
                 sd=sd,
                 sq=sq,
-                m=m
+                m=m,
+                weekly_weather=weekly_weather,
+                weather_variables=selected_weather_variables
             )
 
         st.session_state["reservoir_forecast"] = forecast_df
