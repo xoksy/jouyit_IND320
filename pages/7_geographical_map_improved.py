@@ -206,21 +206,22 @@ for feature in features:
         f"{value:.2f}" if isinstance(value, (int, float)) else str(value or "No data")
     )
 
-# Select colour scale and transparent fill.
-def interpolate_color(start_hex, end_hex, ratio):
-    """Interpolate between two HEX colours."""
-    ratio = max(0.0, min(1.0, float(ratio)))
-    start_rgb = tuple(
-        int(start_hex[i:i + 2], 16) for i in (1, 3, 5)
-    )
-    end_rgb = tuple(
-        int(end_hex[i:i + 2], 16) for i in (1, 3, 5)
-    )
-    rgb = tuple(
-        round(start + (end - start) * ratio)
-        for start, end in zip(start_rgb, end_rgb)
-    )
-    return "#{:02X}{:02X}{:02X}".format(*rgb)
+# Assign clearly distinguishable colours to areas.
+# For numerical indicators, areas are ranked from highest to lowest,
+# then each rank receives a separate colour instead of a continuous gradient.
+
+RANK_COLORS = [
+    "#E63946",  # 1st: red
+    "#457B9D",  # 2nd: blue
+    "#F4A261",  # 3rd: orange
+    "#2A9D8F",  # 4th: teal
+    "#8E5EA2",  # 5th: purple
+    "#E9C46A",  # 6th: yellow
+    "#6D597A",  # 7th: plum
+    "#43AA8B",  # 8th: green
+    "#F15BB5",  # 9th: pink
+    "#577590",  # 10th: slate blue
+]
 
 
 def style_function(feature):
@@ -228,45 +229,51 @@ def style_function(feature):
     number = int(props.get("area_number", 1))
     value = values.get(number)
 
-    # Fixed, clearly distinguishable colours for the five electricity zones.
     if display_by == "Price area" and area_type == "EL":
+        # Stable colour per electricity zone.
         palette = {
-            1: "#E76F51",  # coral
-            2: "#2A9D8F",  # teal
-            3: "#E9C46A",  # yellow
-            4: "#6C63B5",  # violet
-            5: "#3A86FF",  # blue
+            1: "#E63946",  # NO1
+            2: "#457B9D",  # NO2
+            3: "#F4A261",  # NO3
+            4: "#2A9D8F",  # NO4
+            5: "#8E5EA2",  # NO5
         }
         fill = palette.get(number, "#94A3B8")
-        opacity = 0.48
+        opacity = 0.55
 
-    elif isinstance(value, (int, float)):
-        numeric_values = [
-            v for v in values.values()
-            if isinstance(v, (int, float)) and pd.notna(v)
+    elif isinstance(value, (int, float)) and pd.notna(value):
+        # Rank all numeric areas: highest value gets the first colour.
+        numeric_areas = sorted(
+            [
+                (area_number, area_value)
+                for area_number, area_value in values.items()
+                if isinstance(area_value, (int, float))
+                and pd.notna(area_value)
+            ],
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
+        ranked_area_numbers = [
+            area_number for area_number, _ in numeric_areas
         ]
+        rank = ranked_area_numbers.index(number)
 
-        low = min(numeric_values) if numeric_values else 0
-        high = max(numeric_values) if numeric_values else 1
-        ratio = 0.5 if high == low else (value - low) / (high - low)
-
-        # Use a different colour scale for each thematic variable.
-        if display_by == "Water area":
-            # Low filling: pale blue; high filling: deep green.
-            fill = interpolate_color("#DCEEFF", "#087F5B", ratio)
-
-        elif weather_property == "Temperature":
-            # Cold: blue; mild: light neutral; warm: orange-red.
-            if ratio <= 0.5:
-                fill = interpolate_color("#2878B5", "#F3E9C9", ratio * 2)
-            else:
-                fill = interpolate_color("#F3E9C9", "#D94841", (ratio - 0.5) * 2)
-
+        # Use distinct colours for each rank. For more than ten areas,
+        # continue with evenly spaced hues.
+        if rank < len(RANK_COLORS):
+            fill = RANK_COLORS[rank]
         else:
-            # Low precipitation: pale lavender; high: deep purple.
-            fill = interpolate_color("#F1E8FF", "#6A35A8", ratio)
+            import colorsys
+            hue = (rank * 0.61803398875) % 1
+            red, green, blue = colorsys.hsv_to_rgb(hue, 0.62, 0.88)
+            fill = "#{:02X}{:02X}{:02X}".format(
+                round(red * 255),
+                round(green * 255),
+                round(blue * 255),
+            )
 
-        opacity = 0.58
+        opacity = 0.62
 
     else:
         fill, opacity = "#94A3B8", 0.20
@@ -277,7 +284,7 @@ def style_function(feature):
     )
 
     return {
-        "color": "#F8FAFC" if selected else "#64748B",
+        "color": "#FFFFFF" if selected else "#526477",
         "weight": 4 if selected else 1.5,
         "fillColor": fill,
         "fillOpacity": opacity,
