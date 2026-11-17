@@ -261,6 +261,7 @@ if clicked:
         clicked_type = props.get("area_type", area_type)
         clicked_number = int(props.get("area_number", 1))
         st.session_state.shared_area_type = clicked_type
+        st.session_state.shared_area_number = clicked_number
         display_area = 0 if clicked_type == "NO" else clicked_number
         st.success(
             f"Selected: {clicked_type} — Area {display_area}. "
