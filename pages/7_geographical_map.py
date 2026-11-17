@@ -256,6 +256,7 @@ st_folium_result = st_folium(
 clicked = st_folium_result.get("last_active_drawing") if st_folium_result else None
 if clicked:
     props = clicked.get("properties", {})
+    st.write("Clicked GeoJSON properties:", props)
     try:
         clicked_type = props.get("area_type", area_type)
         clicked_number = int(props.get("area_number", 1))
