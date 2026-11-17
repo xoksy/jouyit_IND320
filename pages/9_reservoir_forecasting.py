@@ -680,15 +680,41 @@ if "reservoir_forecast" in st.session_state:
     forecast_fig = go.Figure()
 
     # Historical data
-    forecast_fig.add_trace(
-        go.Scatter(
-            x=historical_data.index,
-            y=historical_data.values,
-            mode="lines",
-            name="Historical filling",
-            line=dict(color="#87CEFA", width=2.5)
+    if using_weather:
+
+        # Full historical curve, displayed discreetly
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=weekly_data.index,
+                y=weekly_data.values,
+                mode="lines",
+                name="Full historical filling",
+                line=dict(color="rgba(160, 170, 185, 0.25)", width=1.5)
+            )
         )
-    )
+
+        # Highlight 2024 historical data
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=historical_data.index,
+                y=historical_data.values,
+                mode="lines",
+                name="Historical filling (2024)",
+                line=dict(color="#87CEFA", width=2.5)
+            )
+        )
+
+    else:
+
+        forecast_fig.add_trace(
+            go.Scatter(
+                x=historical_data.index,
+                y=historical_data.values,
+                mode="lines",
+                name="Historical filling",
+                line=dict(color="#87CEFA", width=2.5)
+            )
+        )
 
     # Forecast
     forecast_fig.add_trace(
