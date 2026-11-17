@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 
 from app_utils import load_reservoirs
 from river import time_series
-from river import linear_model, optim
 import numpy as np
 from weather_utils import load_weather_data
 
@@ -83,237 +82,6 @@ def forecast_reservoir_filling(
         "date_id": future_dates,
         "predicted_filling_degree": predictions
     })
-
-    return forecast_df
-
-# --------------------------------------------------
-# HISTORICAL FORECAST ERRORS (ROLLING FORECAST)
-# --------------------------------------------------
-
-def calculate_rolling_errors(
-    weekly_data,
-    horizon_weeks=13,
-    p=1,
-    d=1,
-    q=1,
-    sp=1,
-    sd=1,
-    sq=0,
-    m=52,
-    max_origins=30
-):
-
-    series = weekly_data.sort_index().dropna()
-
-    min_train_size = 2 * m
-
-    if len(series) < min_train_size + horizon_weeks:
-        raise ValueError(
-            "Not enough data to calculate historical forecast errors."
-        )
-
-    # Select historical forecast origins
-    possible_origins = np.arange(
-        min_train_size,
-        len(series) - horizon_weeks + 1
-    )
-
-    if len(possible_origins) > max_origins:
-        origins = np.linspace(
-            possible_origins[0],
-            possible_origins[-1],
-            max_origins,
-            dtype=int
-        )
-    else:
-        origins = possible_origins
-
-    errors = []
-
-    # Generate historical forecasts
-    for origin in origins:
-
-        train = series.iloc[:origin]
-        actual = series.iloc[origin:origin + horizon_weeks]
-
-        model = time_series.SNARIMAX(
-            p=p,
-            d=d,
-            q=q,
-            sp=sp,
-            sd=sd,
-            sq=sq,
-            m=m
-        )
-
-        for value in train:
-            model.learn_one(float(value))
-
-        predictions = list(
-            model.forecast(horizon=len(actual))
-        )
-
-        if len(predictions) != len(actual):
-            continue
-
-        for lead, (predicted, observed) in enumerate(
-            zip(predictions, actual),
-            start=1
-        ):
-
-            errors.append({
-                "origin_date": train.index[-1],
-                "horizon": lead,
-                "predicted": float(predicted),
-                "actual": float(observed),
-                "error": float(observed) - float(predicted)
-            })
-
-    errors_df = pd.DataFrame(errors)
-
-    if errors_df.empty:
-        raise ValueError(
-            "Unable to calculate historical forecast errors."
-        )
-
-    return errors_df
-
-# --------------------------------------------------
-# TRAIN QUANTILE REGRESSION MODELS
-# --------------------------------------------------
-
-def train_quantile_models(errors_df):
-
-    # Lower quantile: 5%
-    model_lower = linear_model.LinearRegression(
-        loss=optim.losses.Quantile(0.05)
-    )
-
-    # Upper quantile: 95%
-    model_upper = linear_model.LinearRegression(
-        loss=optim.losses.Quantile(0.95)
-    )
-
-    # Train both models using historical forecast errors
-    for _, row in errors_df.iterrows():
-
-        features = {
-            "horizon": float(row["horizon"])
-        }
-
-        error = float(row["error"])
-
-        model_lower.learn_one(features, error)
-        model_upper.learn_one(features, error)
-
-    return model_lower, model_upper
-
-# --------------------------------------------------
-# VALIDATE PREDICTION INTERVALS
-# --------------------------------------------------
-
-def validate_prediction_intervals(errors_df):
-
-    # Sort forecast origins chronologically
-    origins = sorted(errors_df["origin_date"].unique())
-
-    if len(origins) < 5:
-        raise ValueError(
-            "Not enough historical forecast origins for validation."
-        )
-
-    # Chronological split: 70% training, 30% validation
-    split_index = int(len(origins) * 0.7)
-
-    train_origins = origins[:split_index]
-    test_origins = origins[split_index:]
-
-    train_errors = errors_df[
-        errors_df["origin_date"].isin(train_origins)
-    ]
-
-    test_errors = errors_df[
-        errors_df["origin_date"].isin(test_origins)
-    ]
-
-    # Train quantile models only on the training origins
-    model_lower, model_upper = train_quantile_models(train_errors)
-
-    results = []
-
-    for _, row in test_errors.iterrows():
-
-        features = {
-            "horizon": float(row["horizon"])
-        }
-
-        lower_error = model_lower.predict_one(features)
-        upper_error = model_upper.predict_one(features)
-
-        lower_error, upper_error = sorted(
-            [lower_error, upper_error]
-        )
-
-        actual_error = float(row["error"])
-
-        results.append({
-            "horizon": row["horizon"],
-            "actual_error": actual_error,
-            "lower_error": lower_error,
-            "upper_error": upper_error,
-            "covered": (
-                lower_error <= actual_error <= upper_error
-            )
-        })
-
-    validation_df = pd.DataFrame(results)
-
-    coverage = validation_df["covered"].mean() * 100
-
-    return validation_df, coverage
-
-# --------------------------------------------------
-# CALCULATE FORECAST INTERVALS
-# --------------------------------------------------
-
-def add_prediction_intervals(forecast_df, errors_df):
-
-    # Train quantile models
-    model_lower, model_upper = train_quantile_models(errors_df)
-
-    lower_bounds = []
-    upper_bounds = []
-
-    for horizon, prediction in enumerate(
-        forecast_df["predicted_filling_degree"],
-        start=1
-    ):
-
-        features = {
-            "horizon": float(horizon)
-        }
-
-        # Predict lower and upper historical errors
-        lower_error = model_lower.predict_one(features)
-        upper_error = model_upper.predict_one(features)
-
-        # Ensure correct ordering
-        lower_error, upper_error = sorted(
-            [lower_error, upper_error]
-        )
-
-        # Add errors to central SNARIMAX prediction
-        lower = prediction + lower_error
-        upper = prediction + upper_error
-
-        # Keep reservoir filling between 0 and 100%
-        lower_bounds.append(np.clip(lower, 0, 1))
-        upper_bounds.append(np.clip(upper, 0, 1))
-
-    forecast_df = forecast_df.copy()
-
-    forecast_df["lower_bound"] = lower_bounds
-    forecast_df["upper_bound"] = upper_bounds
 
     return forecast_df
 
@@ -720,7 +488,6 @@ st.write(
 # --------------------------------------------------
 
 st.divider()
-
 st.subheader("Generate forecast")
 
 if st.button("Run SNARIMAX forecast", type="primary"):
@@ -728,7 +495,6 @@ if st.button("Run SNARIMAX forecast", type="primary"):
     try:
         with st.spinner("Training SNARIMAX model..."):
 
-            # 1. Generate central SNARIMAX forecast
             forecast_df = forecast_reservoir_filling(
                 weekly_data=training_weekly_data,
                 horizon_weeks=horizon_weeks,
@@ -741,46 +507,8 @@ if st.button("Run SNARIMAX forecast", type="primary"):
                 m=m
             )
 
-            # 2. Calculate prediction intervals only without weather
-            if not selected_weather_variables:
-
-                with st.spinner("Calculating prediction intervals..."):
-
-                    errors_df = calculate_rolling_errors(
-                        weekly_data=training_weekly_data,
-                        horizon_weeks=horizon_weeks,
-                        p=p,
-                        d=d,
-                        q=q,
-                        sp=sp,
-                        sd=sd,
-                        sq=sq,
-                        m=m
-                    )
-
-                    # Validate prediction intervals on unseen historical origins
-                    validation_df, coverage = validate_prediction_intervals(errors_df)
-
-                    st.session_state["forecast_validation"] = {
-                        "coverage": coverage,
-                        "n_predictions": len(validation_df),
-                        "validation_df": validation_df
-                    }
-
-                    forecast_df = add_prediction_intervals(
-                        forecast_df,
-                        errors_df
-                    )
-
-                st.success("Forecast and prediction intervals generated!")
-
-            else:
-                st.success("Forecast successfully generated!")
-
         st.session_state["reservoir_forecast"] = forecast_df
-        st.session_state["forecast_has_intervals"] = (
-            not bool(selected_weather_variables)
-        )
+        st.success("Forecast successfully generated!")
 
     except Exception as error:
         st.error(f"Forecasting error: {error}")
@@ -795,67 +523,8 @@ if "reservoir_forecast" in st.session_state:
 
     st.subheader("Reservoir filling forecast")
 
-    # Display interval validation results
-    if st.session_state.get("forecast_has_intervals", False):
-
-        validation = st.session_state.get("forecast_validation")
-
-        if validation is not None:
-
-            st.subheader("Prediction interval validation")
-
-            col1, col2, col3 = st.columns(3)
-
-            col1.metric(
-                "Observed coverage",
-                f"{validation['coverage']:.1f}%"
-            )
-
-            col2.metric(
-                "Target coverage",
-                "90%"
-            )
-
-            col3.metric(
-                "Tested predictions",
-                validation["n_predictions"]
-            )
-
-            with st.expander("Validation details"):
-
-                st.dataframe(
-                    validation["validation_df"],
-                    use_container_width=True
-                )
-
     forecast_fig = go.Figure()
 
-    # Prediction interval
-    if st.session_state.get("forecast_has_intervals", False):
-
-        forecast_fig.add_trace(
-            go.Scatter(
-                x=forecast_df["date_id"],
-                y=forecast_df["lower_bound"] * 100,
-                mode="lines",
-                line=dict(width=0),
-                showlegend=False,
-                name="Lower bound"
-            )
-        )
-
-        forecast_fig.add_trace(
-            go.Scatter(
-                x=forecast_df["date_id"],
-                y=forecast_df["upper_bound"] * 100,
-                mode="lines",
-                line=dict(width=0),
-                fill="tonexty",
-                fillcolor="rgba(100, 149, 237, 0.20)",
-                name="90% prediction interval"
-            )
-        )
-        
     # Historical data
     forecast_fig.add_trace(
         go.Scatter(
@@ -890,29 +559,12 @@ if "reservoir_forecast" in st.session_state:
     )
 
     # Display forecast table
-    if st.session_state.get("forecast_has_intervals", False):
-
-        display_df = forecast_df.assign(
-            predicted_filling_degree=lambda df:
-                df["predicted_filling_degree"] * 100,
-            lower_bound=lambda df:
-                df["lower_bound"] * 100,
-            upper_bound=lambda df:
-                df["upper_bound"] * 100
-        ).rename(columns={
-            "predicted_filling_degree": "Predicted filling (%)",
-            "lower_bound": "Lower bound (%)",
-            "upper_bound": "Upper bound (%)"
-        })
-
-    else:
-
-        display_df = forecast_df.assign(
-            predicted_filling_degree=lambda df:
-                df["predicted_filling_degree"] * 100
-        ).rename(columns={
-            "predicted_filling_degree": "Predicted filling (%)"
-        })
+    display_df = forecast_df.assign(
+        predicted_filling_degree=lambda df:
+            df["predicted_filling_degree"] * 100
+    ).rename(columns={
+        "predicted_filling_degree": "Predicted filling (%)"
+    })
 
     st.dataframe(
         display_df,
