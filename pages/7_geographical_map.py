@@ -110,15 +110,15 @@ with col3:
 try:
     reservoirs = get_reservoir_data()
 
-    # Available dates depend on the selected data source
+    # Keep the complete reservoir date range for forecasting
+    reservoir_dates = sorted(
+        pd.to_datetime(reservoirs["date_id"]).dt.date.unique()
+    )
+
+    # Available dates for the map display
+    available_dates = reservoir_dates.copy()
+
     if display_by == "Weather property":
-
-        available_dates = sorted(
-            pd.to_datetime(
-                reservoirs["date_id"]
-            ).dt.date.unique()
-        )
-
         weather_start = pd.Timestamp("2024-01-01").date()
         weather_end = pd.Timestamp("2024-12-31").date()
 
@@ -126,14 +126,6 @@ try:
             date for date in available_dates
             if weather_start <= date <= weather_end
         ]
-
-    else:
-
-        available_dates = sorted(
-            pd.to_datetime(
-                reservoirs["date_id"]
-            ).dt.date.unique()
-        )
 
 except Exception as error:
     st.error(f"Unable to retrieve available dates: {error}")
@@ -153,6 +145,21 @@ selected_date = st.select_slider(
     format_func=lambda value: value.strftime("%d %B %Y"),
     key="map_selected_date",
 )
+# Observation interval for analysis and forecasting
+st.subheader("Observation interval")
+
+start_date, end_date = st.slider(
+    "Select training period",
+    min_value=reservoir_dates[0],
+    max_value=reservoir_dates[-1],
+    value=(reservoir_dates[0], reservoir_dates[-1]),
+    format="YYYY-MM-DD",
+    key="map_observation_interval",
+)
+
+# Share the selected interval with other pages
+st.session_state["map_start_date"] = start_date
+st.session_state["map_end_date"] = end_date
 
 geojson = read_geojson(str(GEO_FILES[area_type]))
 features = geojson["features"]
