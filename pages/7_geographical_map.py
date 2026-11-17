@@ -45,7 +45,7 @@ def get_reservoir_values(area_type, selected_date):
     data = data[data["day_diff"] == nearest]
     if area_type == "NO":
         values = {
-            0: data["filling_degree"].mean()
+            1: data["filling_degree"].mean()
         }
     else:
         values = (
