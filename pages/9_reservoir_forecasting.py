@@ -107,11 +107,15 @@ def prepare_weather_data(region_id):
     if weather_df.empty:
         raise ValueError("No weather data available for 2024.")
 
-    # Extract ISO year and week
     iso_dates = weather_df["timestamp"].dt.isocalendar()
 
     weather_df["iso_year"] = iso_dates.year
     weather_df["iso_week"] = iso_dates.week
+
+    # Keep ISO year 2024 only
+    weather_df = weather_df[
+        weather_df["iso_year"] == 2024
+    ].copy()
 
     # Aggregate weather data weekly
     weekly_weather = weather_df.groupby(
@@ -366,6 +370,46 @@ if use_precipitation:
     selected_weather_variables.append("precipitation")
 
 # --------------------------------------------------
+# PREPARE MODEL TRAINING DATA
+# --------------------------------------------------
+
+if selected_weather_variables:
+
+    # Weather data is only available for 2024
+    training_data = reservoirs[
+        (reservoirs["area_type"] == selected_type)
+        & (reservoirs["area_number"] == data_area_number)
+        & (reservoirs["date_id"] >= "2024-01-01")
+        & (reservoirs["date_id"] < "2025-01-01")
+    ].copy()
+
+else:
+
+    # Use the period selected on the geographical map
+    training_data = data.copy()
+
+
+if training_data.empty:
+    st.warning(
+        "No reservoir observations are available "
+        "for the selected training period."
+    )
+    st.stop()
+
+
+training_data["filling_degree"] = pd.to_numeric(
+    training_data["filling_degree"],
+    errors="coerce"
+)
+
+training_weekly_data = (
+    training_data.groupby("date_id")["filling_degree"]
+    .mean()
+    .dropna()
+    .sort_index()
+)
+
+# --------------------------------------------------
 # LOAD WEATHER DATA
 # --------------------------------------------------
 
@@ -426,7 +470,12 @@ st.subheader("Configuration summary")
 
 st.write("**Model:** SNARIMAX (River)")
 st.write(f"**Forecast horizon:** {horizon_weeks} weeks")
-st.write(f"**Training period:** {start_date} → {end_date}")
+
+if selected_weather_variables:
+    st.write(f"**Training period:** "f"{training_weekly_data.index.min().date()} → "f"{training_weekly_data.index.max().date()}")
+    st.caption("Training period restricted to 2024 because of weather data availability.")
+else:
+    st.write(f"**Training period:** {start_date} → {end_date}")
 
 st.write(
     f"**Parameters:** "
@@ -448,7 +497,7 @@ if st.button("Run SNARIMAX forecast", type="primary"):
         with st.spinner("Training SNARIMAX model..."):
 
             forecast_df = forecast_reservoir_filling(
-                weekly_data=weekly_data / 100,
+                weekly_data=training_weekly_data,
                 horizon_weeks=horizon_weeks,
                 p=p,
                 d=d,
