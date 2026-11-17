@@ -645,30 +645,64 @@ if st.button("Run SNARIMAX forecast", type="primary"):
 
 if "reservoir_forecast" in st.session_state:
 
-    forecast_df = st.session_state["reservoir_forecast"]
+    forecast_df = st.session_state["reservoir_forecast"].copy()
 
     st.subheader("Reservoir filling forecast")
+
+    # Check whether weather variables are being used
+    using_weather = bool(selected_weather_variables)
+
+    # Prepare historical data
+    historical_data = weekly_data.copy()
+    historical_data.index = pd.to_datetime(historical_data.index)
+
+    if using_weather:
+        # Keep only 2024 historical data
+        historical_data = historical_data[
+            historical_data.index.year == 2024
+        ]
+
+        # Display only the first 12 forecast weeks
+        forecast_df["date_id"] = pd.to_datetime(forecast_df["date_id"])
+        forecast_plot_df = forecast_df[
+            forecast_df["date_id"] <=
+            forecast_df["date_id"].min() + pd.Timedelta(weeks=12)
+        ]
+
+        forecast_color = "orange"
+        forecast_name = "SNARIMAX forecast (with weather)"
+
+    else:
+        forecast_plot_df = forecast_df
+        forecast_color = "#3867d6"
+        forecast_name = "SNARIMAX forecast"
 
     forecast_fig = go.Figure()
 
     # Historical data
     forecast_fig.add_trace(
         go.Scatter(
-            x=weekly_data.index,
-            y=weekly_data.values,
+            x=historical_data.index,
+            y=historical_data.values,
             mode="lines",
-            name="Historical filling"
+            name="Historical filling",
+            line=dict(color="#87CEFA", width=2.5)
         )
     )
 
     # Forecast
     forecast_fig.add_trace(
         go.Scatter(
-            x=forecast_df["date_id"],
-            y=forecast_df["predicted_filling_degree"]*100,
+            x=forecast_plot_df["date_id"],
+            y=forecast_plot_df["predicted_filling_degree"] * 100,
             mode="lines+markers",
-            name="SNARIMAX forecast",
-            line=dict(dash="dash", width=3)
+            name=forecast_name,
+            line=dict(
+                color=forecast_color,
+                dash="dash",
+                width=3
+            ),
+            marker=dict(size=7)
         )
     )
 
