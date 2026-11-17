@@ -20,6 +20,11 @@ reservoirs = load_reservoirs()
 selected_type = st.session_state.get("shared_area_type")
 selected_area = st.session_state.get("shared_area_number")
 
+# Map geographical selection to NVE area number
+data_area_number = (
+    0 if selected_type == "NO" else selected_area
+)
+
 if selected_type is None or selected_area is None:
     st.warning(
         "No area selected. Please go to Geographical map "
@@ -39,14 +44,14 @@ if not available_areas:
     st.warning(f"No areas available for area type {selected_type}.")
     st.stop()
 
-if selected_area not in available_areas:
+if data_area_number not in available_areas:
     st.warning(
-        f"Area {selected_area} is not available for area type {selected_type}."
+        f"Area {data_area_number} is not available for area type {selected_type}."
     )
     st.stop()
 
 # Display current selection
-st.info(f"Current selection: {selected_type} — Area {selected_area}")
+st.info(f"Current selection: {selected_type} — Area {data_area_number}")
 
 # Filter data
 data = filter_reservoirs(
@@ -54,7 +59,7 @@ data = filter_reservoirs(
     area_type=selected_type
 )
 
-data = data[data["area_number"] == selected_area].copy()
+data = data[data["area_number"] == data_area_number].copy()
 data = data.sort_values("date_id")
 
 # Select measurement

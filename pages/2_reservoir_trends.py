@@ -43,9 +43,15 @@ if selected_type is None or selected_area is None:
 st.info(f"Current selection: {selected_type} – Area {selected_area}")
 
 # Filter data for the selected area
+# Map geographical selection to NVE area number
+data_area_number = (
+    0 if selected_type == "NO" else selected_area
+)
+
+# Filter data for the selected area
 area_data = reservoirs[
     (reservoirs["area_type"] == selected_type)
-    & (reservoirs["area_number"] == selected_area)
+    & (reservoirs["area_number"] == data_area_number)
 ].copy()
 
 minimum_date = reservoirs["date_id"].min().date()
@@ -68,7 +74,7 @@ area_data = area_data[
 ].copy()
 
 area_data = area_data[
-    area_data["area_number"] == selected_area
+    area_data["area_number"] == data_area_number
 ].copy()
 
 columns = numeric_columns(area_data)
