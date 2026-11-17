@@ -206,30 +206,65 @@ for feature in features:
         f"{value:.2f}" if isinstance(value, (int, float)) else str(value or "No data")
     )
 
-# Select colour scale and transparent fill.
+# Assign clearly distinguishable colours to areas.
+# Numeric areas are ranked from highest to lowest and receive distinct colours.
+
+RANK_COLORS = [
+    "#E63946", "#457B9D", "#F4A261", "#2A9D8F", "#8E5EA2",
+    "#E9C46A", "#6D597A", "#43AA8B", "#F15BB5", "#577590",
+]
+
+
 def style_function(feature):
     props = feature["properties"]
     number = int(props.get("area_number", 1))
     value = values.get(number)
+
     if display_by == "Price area" and area_type == "EL":
-        palette = {1: "#22D3EE", 2: "#F59E0B", 3: "#A78BFA", 4: "#4ADE80", 5: "#F87171"}
-        fill = palette.get(number, "#64748B")
-        opacity = 0.28
-    elif isinstance(value, (int, float)):
-        numeric_values = [v for v in values.values() if isinstance(v, (int, float))]
-        low, high = (min(numeric_values), max(numeric_values)) if numeric_values else (0, 1)
-        ratio = 0.5 if high == low else (value - low) / (high - low)
-        # Sequential blue-to-orange ramp.
-        fill = "#2DD4BF" if ratio < 0.33 else ("#60A5FA" if ratio < 0.66 else "#F59E0B")
-        opacity = 0.35
+        palette = {
+            1: "#E63946",
+            2: "#457B9D",
+            3: "#F4A261",
+            4: "#2A9D8F",
+            5: "#8E5EA2",
+        }
+        fill = palette.get(number, "#94A3B8")
+        opacity = 0.55
+
+    elif isinstance(value, (int, float)) and pd.notna(value):
+        ranked_areas = sorted(
+            [
+                (area_number, area_value)
+                for area_number, area_value in values.items()
+                if isinstance(area_value, (int, float))
+                and pd.notna(area_value)
+            ],
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        ranked_numbers = [area_number for area_number, _ in ranked_areas]
+        rank = ranked_numbers.index(number)
+
+        if rank < len(RANK_COLORS):
+            fill = RANK_COLORS[rank]
+        else:
+            import colorsys
+            hue = (rank * 0.61803398875) % 1
+            red, green, blue = colorsys.hsv_to_rgb(hue, 0.62, 0.88)
+            fill = "#{:02X}{:02X}{:02X}".format(
+                round(red * 255), round(green * 255), round(blue * 255)
+            )
+        opacity = 0.62
+
     else:
-        fill, opacity = "#64748B", 0.12
+        fill, opacity = "#94A3B8", 0.20
+
     selected = (
         st.session_state.get("shared_area_type") == area_type
         and st.session_state.get("shared_area_number") == number
     )
     return {
-        "color": "#F8FAFC" if selected else "#94A3B8",
+        "color": "#FFFFFF" if selected else "#526477",
         "weight": 4 if selected else 1.5,
         "fillColor": fill,
         "fillOpacity": opacity,
@@ -240,7 +275,13 @@ def highlight_function(_feature):
     return {"weight": 5, "color": "#FDE047", "fillOpacity": 0.5}
 
 # Centre map on Norway.
-map_object = folium.Map(location=[64.5, 14.5], zoom_start=4, tiles="CartoDB dark_matter")
+map_object = folium.Map(
+    location=[64.5, 14.5],
+    zoom_start=4,
+    tiles="OpenStreetMap",
+    control_scale=True,
+    prefer_canvas=True,
+)
 folium.GeoJson(
     geojson,
     name=f"{area_type} areas",
