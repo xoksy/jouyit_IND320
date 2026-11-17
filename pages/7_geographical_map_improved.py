@@ -207,29 +207,77 @@ for feature in features:
     )
 
 # Select colour scale and transparent fill.
+def interpolate_color(start_hex, end_hex, ratio):
+    """Interpolate between two HEX colours."""
+    ratio = max(0.0, min(1.0, float(ratio)))
+    start_rgb = tuple(
+        int(start_hex[i:i + 2], 16) for i in (1, 3, 5)
+    )
+    end_rgb = tuple(
+        int(end_hex[i:i + 2], 16) for i in (1, 3, 5)
+    )
+    rgb = tuple(
+        round(start + (end - start) * ratio)
+        for start, end in zip(start_rgb, end_rgb)
+    )
+    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
 def style_function(feature):
     props = feature["properties"]
     number = int(props.get("area_number", 1))
     value = values.get(number)
+
+    # Fixed, clearly distinguishable colours for the five electricity zones.
     if display_by == "Price area" and area_type == "EL":
-        palette = {1: "#22D3EE", 2: "#F59E0B", 3: "#A78BFA", 4: "#4ADE80", 5: "#F87171"}
-        fill = palette.get(number, "#64748B")
-        opacity = 0.28
+        palette = {
+            1: "#E76F51",  # coral
+            2: "#2A9D8F",  # teal
+            3: "#E9C46A",  # yellow
+            4: "#6C63B5",  # violet
+            5: "#3A86FF",  # blue
+        }
+        fill = palette.get(number, "#94A3B8")
+        opacity = 0.48
+
     elif isinstance(value, (int, float)):
-        numeric_values = [v for v in values.values() if isinstance(v, (int, float))]
-        low, high = (min(numeric_values), max(numeric_values)) if numeric_values else (0, 1)
+        numeric_values = [
+            v for v in values.values()
+            if isinstance(v, (int, float)) and pd.notna(v)
+        ]
+
+        low = min(numeric_values) if numeric_values else 0
+        high = max(numeric_values) if numeric_values else 1
         ratio = 0.5 if high == low else (value - low) / (high - low)
-        # Sequential blue-to-orange ramp.
-        fill = "#2DD4BF" if ratio < 0.33 else ("#60A5FA" if ratio < 0.66 else "#F59E0B")
-        opacity = 0.35
+
+        # Use a different colour scale for each thematic variable.
+        if display_by == "Water area":
+            # Low filling: pale blue; high filling: deep green.
+            fill = interpolate_color("#DCEEFF", "#087F5B", ratio)
+
+        elif weather_property == "Temperature":
+            # Cold: blue; mild: light neutral; warm: orange-red.
+            if ratio <= 0.5:
+                fill = interpolate_color("#2878B5", "#F3E9C9", ratio * 2)
+            else:
+                fill = interpolate_color("#F3E9C9", "#D94841", (ratio - 0.5) * 2)
+
+        else:
+            # Low precipitation: pale lavender; high: deep purple.
+            fill = interpolate_color("#F1E8FF", "#6A35A8", ratio)
+
+        opacity = 0.58
+
     else:
-        fill, opacity = "#64748B", 0.12
+        fill, opacity = "#94A3B8", 0.20
+
     selected = (
         st.session_state.get("shared_area_type") == area_type
         and st.session_state.get("shared_area_number") == number
     )
+
     return {
-        "color": "#F8FAFC" if selected else "#94A3B8",
+        "color": "#F8FAFC" if selected else "#64748B",
         "weight": 4 if selected else 1.5,
         "fillColor": fill,
         "fillOpacity": opacity,
