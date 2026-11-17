@@ -6,49 +6,59 @@ st.write(
     """
     Welcome to the Norwegian Energy Data Explorer!
 
-    This application provides an interactive exploration of Norwegian
-    energy-related data by combining reservoir statistics, meteorological
-    observations, and cross-border electricity flows.
-    """
-)
-
-st.header("Explore the application")
-
-st.subheader("Reservoir data")
-
-st.write(
-    """
-    Explore Norwegian reservoir statistics through historical measurements,
-    time-series visualizations, and advanced analyses.
-    
-    Available methods include STL decomposition and spectrogram analysis
-    to investigate seasonal patterns and frequency characteristics.
-    """
-)
-
-st.subheader("Weather data")
-
-st.write(
-    """
-    Investigate meteorological conditions across the five Norwegian
-    electricity zones (NO1–NO5). Explore hourly temperature and
-    precipitation measurements and identify unusual observations
-    using SPC and Local Outlier Factor (LOF).
-    """
-)
-
-st.subheader("Cross-border electricity flows")
-
-st.write(
-    """
-    Explore physical electricity exchanges between Norwegian and
-    neighbouring European bidding zones. Compare annual energy
-    distributions and visualize electricity flow variations over time.
+    This application brings together Norwegian reservoir measurements,
+    weather observations and cross-border electricity flows. It provides
+    tools to explore the data, analyse trends and relationships, and
+    generate reservoir filling forecasts.
     """
 )
 
 st.divider()
 
-st.caption(
-    "IND320 Project | Norwegian Energy Data Analysis"
+st.header("Explore the application")
+
+st.subheader("1. Data Exploration")
+
+st.markdown(
+    """
+    - **Reservoir measurements:** browse monthly reservoir measurements
+      from the Norwegian Water Resources and Energy Directorate (NVE),
+      by area and indicator.
+    - **Cross-border flows:** explore physical electricity exchanges
+      between Norway and neighbouring European bidding zones, including
+      annual energy shares and time-series plots.
+    - **Geographical map:** view Norwegian electricity and reservoir areas,
+      display reservoir or weather information, and select an area for use
+      in other pages.
+    """
 )
+
+st.subheader("2. Data Analysis")
+
+st.markdown(
+    """
+    - **Reservoir trends:** visualize the evolution of reservoir indicators
+      over time for the area selected on the geographical map.
+    - **Reservoir analysis:** investigate seasonal patterns and frequency
+      characteristics using STL decomposition and spectrograms.
+    """
+)
+
+st.subheader("3. Advanced Analytics")
+
+st.markdown(
+    """
+    - **Weather anomalies:** detect unusual temperature and precipitation
+      observations using SATV/SPC and Local Outlier Factor (LOF).
+    - **Meteorology & Reservoir Correlation:** study the relationship between
+      weekly weather conditions and reservoir indicators, with an adjustable
+      time lag. The current analysis uses 2024 data.
+    - **Reservoir Forecasting:** predict future reservoir filling levels
+      with the SNARIMAX model. Temperature and/or precipitation can also
+      be included as additional input variables when weather data is available.
+    """
+)
+
+st.divider()
+
+st.caption("IND320 Project | Norwegian Energy Data Explorer")

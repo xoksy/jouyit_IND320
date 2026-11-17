@@ -8,120 +8,154 @@ st.set_page_config(
 st.title("Project information")
 
 st.write(
-    "This application explores Norwegian reservoir statistics, "
-    "meteorological conditions, and physical electricity flows "
-    "between European bidding zones."
+    """
+    The Norwegian Energy Data Explorer is an IND320 project that brings
+    together Norwegian reservoir statistics, meteorological observations
+    and cross-border electricity flows. It combines data exploration,
+    time-series analysis, anomaly detection and reservoir forecasting.
+    """
+)
+
+st.divider()
+
+# --------------------------------------------------
+# PROJECT OBJECTIVE
+# --------------------------------------------------
+
+st.header("Project overview")
+
+st.write(
+    """
+    The objective is to explore Norwegian energy-related data and investigate
+    how reservoir conditions, weather and electricity exchanges evolve over
+    time. The application provides interactive visualizations and analytical
+    tools to help identify trends, seasonal patterns, unusual observations
+    and possible relationships between variables.
+    """
 )
 
 # --------------------------------------------------
-# DATA SOURCES
+# DATA SOURCES AND STORAGE
 # --------------------------------------------------
 
-st.header("Data sources")
+st.header("Data sources and storage")
 
 st.subheader("Reservoir data")
 
 st.write(
-    "Reservoir observations are retrieved from the Norwegian Water "
-    "Resources and Energy Directorate (NVE) Magasinstatistikk API. "
-    "The data includes reservoir filling levels, capacities, and "
-    "weekly changes across different Norwegian area types."
+    """
+    Reservoir measurements are retrieved from the Norwegian Water Resources
+    and Energy Directorate (NVE) Magasinstatistikk API. They include indicators
+    such as filling degree, filling volume, capacity and changes in reservoir
+    levels across Norwegian geographical areas.
+    """
 )
 
 st.subheader("Weather data")
 
 st.write(
-    "Historical meteorological data is retrieved from the Open-Meteo "
-    "Historical Weather API using the ERA5 model. The dataset includes "
-    "hourly temperature and precipitation "
-    "measurements for geographical points across the five Norwegian "
-    "electricity zones (NO1–NO5)."
+    """
+    Historical meteorological observations are sourced from the Open-Meteo
+    Historical Weather API using the ERA5 dataset. The data includes hourly
+    temperature and precipitation observations for geographical points in
+    the five Norwegian electricity zones (NO1–NO5). The analyses currently
+    focus on 2024, the period available in the project dataset.
+    """
 )
 
-st.subheader("Electricity flow data")
+st.subheader("Cross-border electricity flows")
 
 st.write(
-    "Cross-border physical electricity flow measurements are retrieved "
-    "from the ENTSO-E Transparency Platform and stored in the project's "
-    "MongoDB database. The data describes electricity exchanges between "
-    "European bidding zones."
+    """
+    Physical electricity flow measurements are retrieved from the ENTSO-E
+    Transparency Platform. The project stores these records in MongoDB and
+    uses them to explore exchanges between Norway and neighbouring European
+    bidding zones. Power is expressed in MW; energy totals are estimated
+    in MWh by taking the duration between consecutive measurements into account.
+    """
+)
+
+st.caption(
+    "Reservoir measurements are retrieved from the NVE API, while the "
+    "weather and cross-border flow datasets are accessed through the "
+    "project's data-loading utilities."
 )
 
 # --------------------------------------------------
 # ANALYSIS METHODS
 # --------------------------------------------------
 
+st.divider()
 st.header("Analysis methods")
 
-st.subheader("Reservoir analysis")
-
-st.write(
-    "Reservoir filling levels are studied using two time-series analysis "
-    "methods:"
-)
+st.subheader("Reservoir trends and time-series analysis")
 
 st.markdown(
     """
-    - **STL decomposition:** separates the observed time series into
-      trend, seasonal, and residual components.
-    - **Spectrogram:** analyses the frequency content of reservoir
-      filling variations over time.
+    - **Reservoir trends:** visualizes the evolution of selected reservoir
+      indicators over time for the geographical area selected by the user.
+    - **STL decomposition:** separates a time series into trend, seasonal
+      and residual components.
+    - **Spectrogram:** examines how the frequency content of reservoir
+      filling variations changes over time.
     """
 )
 
 st.subheader("Weather anomaly detection")
 
-st.write(
-    "Meteorological data is analysed using two anomaly detection methods:"
-)
-
 st.markdown(
     """
-    - **Precipitation – SPC:** uses Discrete Cosine Transform (DCT)
-      high-pass filtering and robust statistical control limits to
-      identify unusual precipitation variations.
-    - **Temperature – LOF:** uses Local Outlier Factor (LOF) to
-      identify unusual temperature observations.
+    - **SATV / SPC:** applies Discrete Cosine Transform (DCT) high-pass
+      filtering and robust statistical control limits to identify unusual
+      weather observations.
+    - **Local Outlier Factor (LOF):** identifies observations that are
+      unusual compared with their local neighbourhood.
     """
 )
-
-# --------------------------------------------------
-# HOW TO EXPLORE THE APP
-# --------------------------------------------------
-
-st.header("How to explore the app")
-
-st.markdown(
-    """
-    - **Home:** introduction to the project.
-    - **Reservoir measurements:** explore reservoir measurements
-      and monthly summaries by area number.
-    - **Reservoir trends:** visualize reservoir indicators over
-      selected time periods.
-    - **Reservoir analysis:** investigate seasonal trends and
-      frequency characteristics using STL decomposition
-      and spectrograms.
-    - **Weather anomalies:** select an electricity zone and
-      investigate precipitation and temperature anomalies
-      using SPC and LOF.
-    - **Cross-border flows:** explore physical electricity
-      exchanges between European bidding zones, compare annual
-      energy shares, and visualize monthly flow patterns.
-    - **Project information:** discover the data sources
-      and analytical methods used in this project.
-    """
-)
-
-# --------------------------------------------------
-# PROJECT OBJECTIVE
-# --------------------------------------------------
-
-st.header("Project objective")
 
 st.write(
-    "The objective of this project is to explore and analyse Norwegian "
-    "energy-related data by combining reservoir statistics, meteorological "
-    "observations, and cross-border electricity flows. Time-series analysis "
-    "and anomaly detection methods are used to identify trends, seasonal "
-    "patterns, and unusual observations."
+    "Both anomaly detection approaches can be applied to the weather "
+    "properties offered by the application: temperature and precipitation."
 )
+
+# --------------------------------------------------
+# ADVANCED ANALYTICS
+# --------------------------------------------------
+
+st.divider()
+st.header("Advanced analytics")
+
+st.subheader("Meteorology & Reservoir Correlation")
+
+st.write(
+    """
+    This page compares weekly weather observations with weekly reservoir
+    indicators for a selected electricity zone. It calculates the Pearson
+    correlation coefficient and allows a time lag to be applied to the
+    weather variable, making it possible to investigate whether earlier
+    weather conditions are associated with later changes in reservoir levels.
+    The current analysis uses data from 2024.
+    """
+)
+
+st.subheader("Reservoir forecasting")
+
+st.write(
+    """
+    Reservoir filling levels are forecast using the SNARIMAX model from
+    the River library. The user can select the forecast horizon and adjust
+    the model parameters. Temperature and precipitation can also be selected
+    as exogenous input variables when generating a weather-based forecast.
+    """
+)
+
+st.info(
+    "Weather-based forecasting is currently limited by the availability "
+    "of weather observations for 2024. Future weather inputs are based on "
+    "the corresponding 2024 weekly observations, so they represent a "
+    "reference-weather scenario rather than an independent weather forecast."
+)
+
+st.divider()
+
+st.caption("IND320 Project | Norwegian Energy Data Explorer")
