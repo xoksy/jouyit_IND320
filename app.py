@@ -29,7 +29,7 @@ pages = {
     "Data Exploration": [
         st.Page("pages/1_reservoir_measurements.py", title="Reservoir measurements", icon="💧"),
         st.Page("pages/5_cross_border_flows.py", title="Cross-border flows", icon="⚡"),
-        st.Page("pages/7_geographical_map_improved.py",    title="Geographical map", icon="🗺️")
+        st.Page("pages/7_geographical_map.py",    title="Geographical map", icon="🗺️")
     ],
 
     "Data Analysis": [
