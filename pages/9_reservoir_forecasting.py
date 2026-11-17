@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from app_utils import load_reservoirs
 from river import time_series
 import numpy as np
-from weather_utils import load_weather_data
+from weather_utils import load_weather_weekly
 
 # --------------------------------------------------
 # SNARIMAX FORECASTING
@@ -211,38 +211,18 @@ def forecast_reservoir_filling(
 @st.cache_data(ttl=3600)
 def prepare_weather_data(region_id):
 
-    weather_df = load_weather_data(region_id).copy()
-
-    weather_df["timestamp"] = pd.to_datetime(
-        weather_df["timestamp"],
-        utc=True
+    weekly_weather = load_weather_weekly(
+        region_id=region_id,
+        year=2024
     )
 
-    # Keep 2024 only
-    weather_df = weather_df[
-        weather_df["timestamp"].dt.year == 2024
-    ].copy()
-
-    if weather_df.empty:
-        raise ValueError("No weather data available for 2024.")
-
-    iso_dates = weather_df["timestamp"].dt.isocalendar()
-
-    weather_df["iso_year"] = iso_dates.year
-    weather_df["iso_week"] = iso_dates.week
-
     # Keep ISO year 2024 only
-    weather_df = weather_df[
-        weather_df["iso_year"] == 2024
+    weekly_weather = weekly_weather[
+        weekly_weather["iso_year"] == 2024
     ].copy()
 
-    # Aggregate weather data weekly
-    weekly_weather = weather_df.groupby(
-        ["iso_year", "iso_week"]
-    ).agg(
-        temperature_2m=("temperature_2m", "mean"),
-        precipitation=("precipitation", "sum")
-    ).reset_index()
+    if weekly_weather.empty:
+        raise ValueError("No weather data available for 2024.")
 
     return weekly_weather
 
