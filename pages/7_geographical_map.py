@@ -43,7 +43,16 @@ def get_reservoir_values(area_type, selected_date):
         return {}, None
     nearest = data["day_diff"].min()
     data = data[data["day_diff"] == nearest]
-    values = data.groupby("area_number")["filling_degree"].mean().to_dict()
+    if area_type == "NO":
+        values = {
+            1: data["filling_degree"].mean()
+        }
+    else:
+        values = (
+            data.groupby("area_number")["filling_degree"]
+            .mean()
+            .to_dict()
+        )
     actual_date = data["date_id"].max().date()
     return values, actual_date
 
