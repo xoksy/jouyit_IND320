@@ -305,16 +305,6 @@ horizon_weeks = st.slider(
 # SNARIMAX CONFIGURATION
 # --------------------------------------------------
 
-st.subheader("Forecast horizon")
-
-horizon_weeks = st.slider(
-    "Number of weeks to forecast",
-    min_value=1,
-    max_value=52,
-    value=13,
-    help="Number of weeks to predict into the future."
-)
-
 st.subheader("SNARIMAX parameters")
 
 with st.expander("Advanced model parameters", expanded=True):
@@ -427,7 +417,7 @@ if selected_weather_variables:
             st.error(
                 f"Unable to load weather data: {error}"
             )
-            
+
 # --------------------------------------------------
 # FORECAST SUMMARY
 # --------------------------------------------------
