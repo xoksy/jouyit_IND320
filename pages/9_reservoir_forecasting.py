@@ -68,7 +68,7 @@ def forecast_reservoir_filling(
     if not np.isfinite(predictions).all():
         raise ValueError("The model produced invalid predictions.")
 
-    predictions = np.clip(predictions, 0, 1)
+    predictions = np.clip(predictions, 0, 100)
 
     # 6. Generate future dates
     future_dates = pd.date_range(
@@ -541,7 +541,7 @@ if "reservoir_forecast" in st.session_state:
     forecast_fig.add_trace(
         go.Scatter(
             x=forecast_df["date_id"],
-            y=forecast_df["predicted_filling_degree"] * 100,
+            y=forecast_df["predicted_filling_degree"],
             mode="lines+markers",
             name="SNARIMAX forecast",
             line=dict(dash="dash", width=3)
@@ -563,7 +563,7 @@ if "reservoir_forecast" in st.session_state:
     st.dataframe(
         forecast_df.assign(
             predicted_filling_degree=lambda df:
-                df["predicted_filling_degree"] * 100
+                df["predicted_filling_degree"]
         ).rename(columns={
             "predicted_filling_degree": "Predicted filling (%)"
         }),
