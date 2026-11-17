@@ -207,20 +207,11 @@ for feature in features:
     )
 
 # Assign clearly distinguishable colours to areas.
-# For numerical indicators, areas are ranked from highest to lowest,
-# then each rank receives a separate colour instead of a continuous gradient.
+# Numeric areas are ranked from highest to lowest and receive distinct colours.
 
 RANK_COLORS = [
-    "#E63946",  # 1st: red
-    "#457B9D",  # 2nd: blue
-    "#F4A261",  # 3rd: orange
-    "#2A9D8F",  # 4th: teal
-    "#8E5EA2",  # 5th: purple
-    "#E9C46A",  # 6th: yellow
-    "#6D597A",  # 7th: plum
-    "#43AA8B",  # 8th: green
-    "#F15BB5",  # 9th: pink
-    "#577590",  # 10th: slate blue
+    "#E63946", "#457B9D", "#F4A261", "#2A9D8F", "#8E5EA2",
+    "#E9C46A", "#6D597A", "#43AA8B", "#F15BB5", "#577590",
 ]
 
 
@@ -230,20 +221,18 @@ def style_function(feature):
     value = values.get(number)
 
     if display_by == "Price area" and area_type == "EL":
-        # Stable colour per electricity zone.
         palette = {
-            1: "#E63946",  # NO1
-            2: "#457B9D",  # NO2
-            3: "#F4A261",  # NO3
-            4: "#2A9D8F",  # NO4
-            5: "#8E5EA2",  # NO5
+            1: "#E63946",
+            2: "#457B9D",
+            3: "#F4A261",
+            4: "#2A9D8F",
+            5: "#8E5EA2",
         }
         fill = palette.get(number, "#94A3B8")
         opacity = 0.55
 
     elif isinstance(value, (int, float)) and pd.notna(value):
-        # Rank all numeric areas: highest value gets the first colour.
-        numeric_areas = sorted(
+        ranked_areas = sorted(
             [
                 (area_number, area_value)
                 for area_number, area_value in values.items()
@@ -253,14 +242,9 @@ def style_function(feature):
             key=lambda item: item[1],
             reverse=True,
         )
+        ranked_numbers = [area_number for area_number, _ in ranked_areas]
+        rank = ranked_numbers.index(number)
 
-        ranked_area_numbers = [
-            area_number for area_number, _ in numeric_areas
-        ]
-        rank = ranked_area_numbers.index(number)
-
-        # Use distinct colours for each rank. For more than ten areas,
-        # continue with evenly spaced hues.
         if rank < len(RANK_COLORS):
             fill = RANK_COLORS[rank]
         else:
@@ -268,11 +252,8 @@ def style_function(feature):
             hue = (rank * 0.61803398875) % 1
             red, green, blue = colorsys.hsv_to_rgb(hue, 0.62, 0.88)
             fill = "#{:02X}{:02X}{:02X}".format(
-                round(red * 255),
-                round(green * 255),
-                round(blue * 255),
+                round(red * 255), round(green * 255), round(blue * 255)
             )
-
         opacity = 0.62
 
     else:
@@ -282,7 +263,6 @@ def style_function(feature):
         st.session_state.get("shared_area_type") == area_type
         and st.session_state.get("shared_area_number") == number
     )
-
     return {
         "color": "#FFFFFF" if selected else "#526477",
         "weight": 4 if selected else 1.5,
@@ -295,9 +275,6 @@ def highlight_function(_feature):
     return {"weight": 5, "color": "#FDE047", "fillOpacity": 0.5}
 
 # Centre map on Norway.
-# OpenStreetMap provides a complete geographic basemap without requiring
-# a third-party API key. It shows the surrounding countries, coastlines,
-# roads, cities and place names beneath the coloured Norwegian areas.
 map_object = folium.Map(
     location=[64.5, 14.5],
     zoom_start=4,
@@ -305,8 +282,6 @@ map_object = folium.Map(
     control_scale=True,
     prefer_canvas=True,
 )
-
-# Thematic area layer: existing area colours and opacity are preserved.
 folium.GeoJson(
     geojson,
     name=f"{area_type} areas",
@@ -319,7 +294,6 @@ folium.GeoJson(
         sticky=True,
     ),
 ).add_to(map_object)
-
 folium.LayerControl(collapsed=True).add_to(map_object)
 
 st_folium_result = st_folium(
