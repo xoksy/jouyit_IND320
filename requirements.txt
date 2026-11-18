@@ -12,3 +12,7 @@ plotly
 folium
 streamlit-folium
 river
+requests
+geopandas
+entsoe-py
+pyspark
